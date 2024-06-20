@@ -24,7 +24,7 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
         tag: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        artifact: "tracker"
 
     # - name: Upload Release Asset
     #   id: upload-release-asset 
