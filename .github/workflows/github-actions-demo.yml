@@ -1,10 +1,9 @@
-name: Tracker Cli
+name: Releases
 
-on:
+on: 
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+    - '*'
 
 jobs:
   build:
@@ -25,15 +24,4 @@ jobs:
     - name: Create Release
       uses: ncipollo/release-action@v1
       with:
-        tag: "$(date +%+4Y-%m-%d)"
         artifact: "tracker"
-
-    # - name: Upload Release Asset
-    #   id: upload-release-asset 
-    #   uses: softprops/action-gh-release@v2
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-    #     asset_path: ./tracker
-    #     asset_name: tracker
