@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"tracker_cli/internal/pkg/day_method"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/role"
@@ -110,9 +109,7 @@ func (t *TaskManager) Stop() {
 	AddTaskRecord(t.Name, int(t.TimeDone))
 
 	statistic.StatisticTaskShow(t.Name)
-	if day_method.IsWeekendNow() || t.Role != "rest" {
-		statistic.StatisticFullShow()
-		rest.RestShow()
-	}
+	statistic.StatisticFullShow()
+	rest.RestShow()
 	telegram.TelegramStopSend(t.Name, t.MsgID, int(t.TimeDone), t.TimeEnd.Format("2 January 2006 15:04"))
 }
