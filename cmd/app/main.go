@@ -4,7 +4,7 @@ package main
 import (
 	"log/slog"
 	"os"
-	"tracker_cli/internal/service/cli"
+	"tracker_cli/internal/interface/cli"
 
 	"github.com/lmittmann/tint"
 )

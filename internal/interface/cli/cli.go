@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"time"
-	"tracker_cli/internal/service/manage"
+	"tracker_cli/internal/service"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/role"
@@ -83,7 +83,7 @@ func (p *ParamsDataStruct) RunSystemCommand() {
 
 	// Clean Data
 	if *p.cleanData {
-		manage.CleanData()
+		service.CleanData()
 		os.Exit(0)
 	}
 
