@@ -19,9 +19,9 @@ type TaskPercent struct {
 }
 
 type TaskParams struct {
-	Name             string `json:"name"`
-	TimePlanDuration int    `json:"time_plan_duration"`
-	Priority         int    `json:"priority"`
+	Name     string `json:"name"`
+	Time     int    `json:"time"`
+	Priority int    `json:"priority"`
 }
 
 type TaskRecorcRequest struct {
