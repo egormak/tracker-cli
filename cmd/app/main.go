@@ -4,7 +4,7 @@ package main
 import (
 	"log/slog"
 	"os"
-	"tracker_cli/internal/interface/cli"
+	"tracker_cli/cmd/command"
 
 	"github.com/lmittmann/tint"
 )
@@ -18,12 +18,14 @@ func main() {
 	slog.SetDefault(logger)
 	slog.Info("Start Application")
 
-	app, err := cli.NewParams()
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
+	command.Execute()
 
-	app.RunSystemCommand()
-	app.RunService()
+	// app, err := cli.NewParams()
+	// if err != nil {
+	// 	slog.Error(err.Error())
+	// 	os.Exit(1)
+	// }
+
+	// app.RunSystemCommand()
+	// app.RunService()
 }
