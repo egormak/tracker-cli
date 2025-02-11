@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,7 +14,7 @@ var client = http.Client{
 	Timeout: timeout,
 }
 
-func sendRequest(method, path string, body *bytes.Buffer) (io.ReadCloser, error) {
+func sendRequest(method, path string, body io.Reader) (io.ReadCloser, error) {
 
 	url := fmt.Sprintf("%s%s", config.TrackerDomain, path)
 
@@ -31,7 +30,6 @@ func sendRequest(method, path string, body *bytes.Buffer) (io.ReadCloser, error)
 	if err != nil {
 		return nil, fmt.Errorf("request error: %w", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("request error: status code %d", resp.StatusCode)
