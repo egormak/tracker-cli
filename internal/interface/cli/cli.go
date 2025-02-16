@@ -2,16 +2,12 @@ package cli
 
 import (
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
-	"time"
-	"tracker_cli/internal/service"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/role"
 	"tracker_cli/internal/service/statistic"
-	"tracker_cli/internal/service/task"
 	"tracker_cli/internal/service/task_params"
 	"tracker_cli/internal/service/timer"
 )
@@ -25,7 +21,6 @@ type ParamsDataStruct struct {
 	percentPlan   *bool
 	percentsSet   *string
 	statsShow     *bool
-	restSpend     *int
 	roleRecheck   *bool
 	taskConfig    *bool
 	taskName      *string
@@ -44,9 +39,7 @@ func NewParams() (*ParamsDataStruct, error) {
 	p := &ParamsDataStruct{}
 	// Main Command
 	// General
-	p.cleanData = flag.Bool("clean_data", false, "Clean All Data")
 	p.percentsSet = flag.String("percents_set", "", "Set Percents from List")
-	p.restSpend = flag.Int("rest_spend", 0, "Set how much do you rest")
 	p.roleRecheck = flag.Bool("recheck", false, "Recheck role statistics")
 	p.statsShow = flag.Bool("stats", false, "Show statistics")
 	p.taskConfig = flag.Bool("config", false, "Set Config Option")
@@ -81,27 +74,9 @@ func NewParams() (*ParamsDataStruct, error) {
 
 func (p *ParamsDataStruct) RunSystemCommand() {
 
-	// Clean Data
-	if *p.cleanData {
-		service.CleanData()
-		os.Exit(0)
-	}
-
 	// ProcentSets
 	if *p.percentsSet != "" {
 		procent.ProcentSets(*p.percentsSet, *p.taskName)
-		os.Exit(0)
-	}
-
-	// Show Statistics
-	if *p.statsShow {
-		statistic.StatisticShow()
-		os.Exit(0)
-	}
-
-	// Set how much rest
-	if *p.restSpend != 0 {
-		rest.RestSpend(*p.restSpend)
 		os.Exit(0)
 	}
 
@@ -142,41 +117,38 @@ func (p *ParamsDataStruct) RunSystemCommand() {
 
 }
 
-func (p *ParamsDataStruct) RunService() {
-	// Run Service
+// func (p *ParamsDataStruct) RunService() {
+// 	// Run Service
 
-	if *p.percentPlan {
-		taskPlan := task.GetTaskByProcentPlan()
-		slog.Info(fmt.Sprintf("\033[33mTaskName:\033[32m %s\033[0m", taskPlan.Name), "percent", taskPlan.Procent)
-		time.Sleep(time.Second * 15)
-		taskPlan.TasksInit()
-	}
+// 	if *p.percentPlan {
+// 		service.PlanPercent()
+// 	}
 
-	if *p.plan {
-		taskPlan := task.GetTaskDay(*p.percent)
-		if taskPlan.Name == "" {
-			slog.Info("Task Name can't Get, maybe all plan was done.")
-			os.Exit(0)
-		}
-		slog.Info(fmt.Sprintf("\033[33mTaskName:\033[32m %s\033[0m", taskPlan.Name))
-		time.Sleep(time.Second * 15)
-		taskPlan.TasksInit()
-	}
+// 	if *p.plan {
+// 		taskPlan := task.GetTaskDay(*p.percent)
+// 		if taskPlan.Name == "" {
+// 			slog.Info("Task Name can't Get, maybe all plan was done.")
+// 			os.Exit(0)
+// 		}
+// 		slog.Info(fmt.Sprintf("\033[33mTaskName:\033[32m %s\033[0m", taskPlan.Name))
+// 		time.Sleep(time.Second * 15)
+// 		taskPlan.TasksInit()
+// 	}
 
-	if *p.taskName != "" {
-		taskName := *p.taskName
-		taskConfig := task.TasksNew(taskName, *p.timer, *p.percent)
-		taskConfig.TasksInit()
-	}
+// 	if *p.taskName != "" {
+// 		taskName := *p.taskName
+// 		taskConfig := task.TasksNew(taskName, *p.timer, *p.percent)
+// 		taskConfig.TasksInit()
+// 	}
 
-	// if *p.menu {
-	// 	taskName = menu.RunMenu()
-	// }
+// if *p.menu {
+// 	taskName = menu.RunMenu()
+// }
 
-	// // Init Service
-	// taskD = TasksNew(taskName, *p.timer, *p.timerRandom, *p.procent)
-	// taskD.TasksInit()
-}
+// // Init Service
+// taskD = TasksNew(taskName, *p.timer, *p.timerRandom, *p.procent)
+// taskD.TasksInit()
+// }
 
 // func (p *ParamsDataStruct) RunService() {
 
