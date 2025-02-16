@@ -62,7 +62,10 @@ func (t *TaskTimer) Stop() {
 	// Set value
 	t.TimeEnd = time.Now()
 	t.TimeDone = t.TimeEnd.Sub(t.TimeBegin).Minutes()
-	api.AddTaskRecord(t.Name, int(t.TimeDone))
+
+	if t.TimeDone > 1 {
+		api.AddTaskRecord(t.Name, int(t.TimeDone))
+	}
 
 	statistic.StatisticTaskShow(t.Name)
 	statistic.StatisticFullShow()
