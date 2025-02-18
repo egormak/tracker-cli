@@ -28,3 +28,11 @@ type TaskRecorcRequest struct {
 	TaskName string `json:"task_name"`
 	TimeDone int    `json:"time_done"`
 }
+
+type TaskList struct {
+	Name         string `json:"name"`
+	Role         string `json:"role"`
+	TimeDuration int    `json:"time_duration"`
+	TimeDone     int    `json:"time_done"`
+	Priority     int    `json:"priority"`
+}

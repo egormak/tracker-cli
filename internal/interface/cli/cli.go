@@ -5,28 +5,23 @@ import (
 	"log/slog"
 	"os"
 	"tracker_cli/internal/service/procent"
-	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/role"
-	"tracker_cli/internal/service/statistic"
 	"tracker_cli/internal/service/task_params"
 	"tracker_cli/internal/service/timer"
 )
 
 type ParamsDataStruct struct {
-	cleanData     *bool
 	menu          *bool
 	plan          *bool
 	priority      *int
 	percent       *int
 	percentPlan   *bool
 	percentsSet   *string
-	statsShow     *bool
 	roleRecheck   *bool
 	taskConfig    *bool
 	taskName      *string
 	taskNameAdd   *string
 	taskNameDel   *string
-	taskNameList  *bool
 	taskNameRole  *string
 	taskRecordAdd *bool
 	timer         *int
@@ -41,9 +36,7 @@ func NewParams() (*ParamsDataStruct, error) {
 	// General
 	p.percentsSet = flag.String("percents_set", "", "Set Percents from List")
 	p.roleRecheck = flag.Bool("recheck", false, "Recheck role statistics")
-	p.statsShow = flag.Bool("stats", false, "Show statistics")
 	p.taskConfig = flag.Bool("config", false, "Set Config Option")
-	p.taskNameList = flag.Bool("tasklist", false, "List available Task")
 	p.taskRecordAdd = flag.Bool("taskrecordadd", false, "Add task record")
 
 	// Logic for Run TaskManager
@@ -83,12 +76,6 @@ func (p *ParamsDataStruct) RunSystemCommand() {
 	// Recheck all Task Statistics
 	if *p.roleRecheck {
 		role.RoleRecheck()
-		os.Exit(0)
-	}
-
-	// Show TaskConfig
-	if *p.taskNameList {
-		statistic.ShowTaskNameList()
 		os.Exit(0)
 	}
 

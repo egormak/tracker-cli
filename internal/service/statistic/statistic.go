@@ -3,7 +3,6 @@ package statistic
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -11,90 +10,6 @@ import (
 	"tracker_cli/config"
 	"tracker_cli/internal/service/task_params"
 )
-
-func StatisticShow() {
-
-	slog.Info("Start Statistic Query")
-
-	// Set Value
-	resultRecords := make(map[string]map[string]int)
-	resultRoleRecords := make(map[string]int)
-
-	// Get
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	// Get TaskRecords
-	requestTaskRecords, _ := http.NewRequest("GET", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/records"), nil)
-	respTaskRecords, err := client.Do(requestTaskRecords)
-	if err != nil {
-		slog.Error("request error", "error", err)
-	}
-	if respTaskRecords.StatusCode != 200 {
-		slog.Error("request error", "status code", respTaskRecords.StatusCode)
-	}
-	defer respTaskRecords.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(respTaskRecords.Body)
-	if err != nil {
-		slog.Error("can't read body", "error", err)
-	}
-
-	// Unmarshal JSON data into a struct
-	err = json.Unmarshal(body, &resultRecords)
-	if err != nil {
-		slog.Error("can't unmarshal JSON", "error", err)
-	}
-
-	// Get RoleRecords
-	requestRoleRecords, _ := http.NewRequest("GET", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/roles/records"), nil)
-	respRoleRecords, err := client.Do(requestRoleRecords)
-	if err != nil {
-		slog.Error("request error", "error", err)
-	}
-	if respRoleRecords.StatusCode != 200 {
-		slog.Error("request error", "status code", respTaskRecords.StatusCode)
-	}
-	defer respRoleRecords.Body.Close()
-
-	// Read the response body
-	body, err = io.ReadAll(respRoleRecords.Body)
-	if err != nil {
-		slog.Error("can't read body", "error", err)
-	}
-
-	// Unmarshal JSON data into a struct
-	err = json.Unmarshal(body, &resultRoleRecords)
-	if err != nil {
-		slog.Error("can't unmarshal JSON", "error", err)
-	}
-
-	// TODO USE bubbletea
-	// Show Information
-	fmt.Println("####")
-	fmt.Println("All Days was Done: ")
-	for k, v := range resultRecords["all"] {
-		fmt.Printf("Tasks: %s, Times: %d\n", k, v)
-	}
-	fmt.Println("\n####")
-	fmt.Println("Yesterday was Done: ")
-	for k, v := range resultRecords["yesterday"] {
-		fmt.Printf("Tasks: %s, Times: %d\n", k, v)
-	}
-	fmt.Println("\n####")
-	fmt.Println("For Today was Done: ")
-	for k, v := range resultRecords["today"] {
-		fmt.Printf("Tasks: %s, Times: %d\n", k, v)
-	}
-	fmt.Println("\n####")
-	fmt.Println("Roles Info: ")
-	for k, v := range resultRoleRecords {
-		fmt.Printf("Roles: %s, Times: %d\n", k, v)
-	}
-}
 
 func StatisticTaskShow(taskName string) {
 

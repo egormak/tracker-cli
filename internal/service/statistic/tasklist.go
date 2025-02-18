@@ -9,18 +9,11 @@ import (
 	"strconv"
 	"time"
 	"tracker_cli/config"
+	"tracker_cli/internal/domain/entity"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 )
-
-type TaskList struct {
-	Name         string `json:"name"`
-	Role         string `json:"role"`
-	TimeDuration int    `json:"time_duration"`
-	TimeDone     int    `json:"time_done"`
-	Priority     int    `json:"priority"`
-}
 
 func ShowTaskNameList() {
 
@@ -47,7 +40,7 @@ func ShowTaskNameList() {
 
 	defer resp.Body.Close()
 
-	var taskList []TaskList
+	var taskList []entity.TaskList
 	err = json.NewDecoder(resp.Body).Decode(&taskList)
 	if err != nil {
 		slog.Error("failed to decode response: %w", err)
@@ -57,7 +50,7 @@ func ShowTaskNameList() {
 	renderTaskList(taskList)
 }
 
-func renderTaskList(taskList []TaskList) {
+func renderTaskList(taskList []entity.TaskList) {
 	var rows [][]string
 
 	re := lipgloss.NewRenderer(os.Stdout)
