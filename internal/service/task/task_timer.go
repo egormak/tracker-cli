@@ -52,7 +52,9 @@ func (t *TaskTimer) Start() {
 	}
 
 	timer.TimeDurationDel(t.TimeDuration)
-	procent.ChangeGroupPlanPercent()
+	if err := procent.ChangeGroupPlanPercent(); err != nil {
+		slog.Error("failed to notify percent change", "error", err)
+	}
 
 	slog.Info("End Timer")
 }

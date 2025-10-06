@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log/slog"
 	"os"
-	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/role"
 	"tracker_cli/internal/service/task_params"
 	"tracker_cli/internal/service/timer"
@@ -16,7 +15,6 @@ type ParamsDataStruct struct {
 	priority      *int
 	percent       *int
 	percentPlan   *bool
-	percentsSet   *string
 	roleRecheck   *bool
 	taskConfig    *bool
 	taskName      *string
@@ -34,15 +32,11 @@ func NewParams() (*ParamsDataStruct, error) {
 	p := &ParamsDataStruct{}
 	// Main Command
 	// General
-	p.percentsSet = flag.String("percents_set", "", "Set Percents from List")
 	p.roleRecheck = flag.Bool("recheck", false, "Recheck role statistics")
 	p.taskConfig = flag.Bool("config", false, "Set Config Option")
-	p.taskRecordAdd = flag.Bool("taskrecordadd", false, "Add task record")
 
 	// Logic for Run TaskManager
 	p.menu = flag.Bool("menu", false, "Run Menu")
-	p.percentPlan = flag.Bool("percent_plan", false, "Run Percent Plan")
-	p.plan = flag.Bool("plan", false, "Run Task from Plan on Day")
 
 	// Manage Task List
 	p.taskNameDel = flag.String("taskdel", "", "Remove available Task")
@@ -65,12 +59,6 @@ func NewParams() (*ParamsDataStruct, error) {
 }
 
 func (p *ParamsDataStruct) RunSystemCommand() {
-
-	// ProcentSets
-	if *p.percentsSet != "" {
-		procent.ProcentSets(*p.percentsSet, *p.taskName)
-		os.Exit(0)
-	}
 
 	// Recheck all Task Statistics
 	if *p.roleRecheck {
