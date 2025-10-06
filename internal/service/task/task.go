@@ -1,9 +1,9 @@
 package task
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/repository/api"
 
@@ -13,34 +13,42 @@ import (
 // ErrTaskCompleted indicates that no time remains for the task
 var ErrTaskCompleted = fmt.Errorf("no time remaining for this task")
 
-func TaskRun(cmd *cobra.Command, args []string) {
-	fmt.Println("Run Task")
+func TaskRun(cmd *cobra.Command, args []string) error {
 	taskName, err := cmd.Flags().GetString("name")
 	if err != nil {
-		slog.Error("failed to get task name", "error", err)
-	}
-	taskTime, err := cmd.Flags().GetInt("time")
-	if err != nil {
-		slog.Error("failed to get task time", "error", err)
-	}
-	taskPercent, err := cmd.Flags().GetInt("percent")
-	if err != nil {
-		slog.Error("failed to get task percent", "error", err)
+		return fmt.Errorf("read task name flag: %w", err)
 	}
 
-	taskApp := CreateTaskTimer(taskName, taskTime, taskPercent)
-	taskApp.Run()
+	taskTime, err := cmd.Flags().GetInt("time")
+	if err != nil {
+		return fmt.Errorf("read task time flag: %w", err)
+	}
+
+	taskPercent, err := cmd.Flags().GetInt("percent")
+	if err != nil {
+		return fmt.Errorf("read task percent flag: %w", err)
+	}
+
+	taskApp, err := CreateTaskTimer(taskName, taskTime, taskPercent)
+	if err != nil {
+		if errors.Is(err, ErrTaskCompleted) {
+			cmd.Printf("task %s has no remaining time for the selected percent\n", taskName)
+			return nil
+		}
+		return err
+	}
+
+	return taskApp.Run()
 }
 
 // CreateTaskTimer initializes a new TaskTimer object with the provided parameters
-func CreateTaskTimer(name string, requestedDuration, percent int) *TaskTimer {
+func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, error) {
 	taskParams := api.GetTaskParams(name)
 	taskDone := api.StatisticTaskGet(name)
 
 	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone)
 	if err != nil {
-		slog.Error("calculating duration", "error", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("calculate duration: %w", err)
 	}
 
 	// Return a new TaskTimer object
@@ -48,7 +56,7 @@ func CreateTaskTimer(name string, requestedDuration, percent int) *TaskTimer {
 		Name:         name,
 		Role:         api.TaskRoleGet(name),
 		TimeDuration: duration,
-	}
+	}, nil
 }
 
 // calculateDuration determines the appropriate time duration for the task

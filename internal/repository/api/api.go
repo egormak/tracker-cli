@@ -32,6 +32,12 @@ func sendRequest(method, path string, body io.Reader) (io.ReadCloser, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusInternalServerError {
+			return nil, fmt.Errorf("server error: %d", resp.StatusCode)
+		}
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("not found: %d", resp.StatusCode)
+		}
 		return nil, fmt.Errorf("request error: status code %d", resp.StatusCode)
 	}
 

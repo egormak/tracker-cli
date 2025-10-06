@@ -9,7 +9,7 @@ import (
 var taskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Run Task",
-	Run:   task.TaskRun,
+	RunE:  task.TaskRun,
 }
 
 func init() {

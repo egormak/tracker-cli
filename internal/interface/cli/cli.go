@@ -45,7 +45,6 @@ func NewParams() (*ParamsDataStruct, error) {
 	p.plan = flag.Bool("plan", false, "Run Task from Plan on Day")
 
 	// Manage Task List
-	p.taskNameAdd = flag.String("taskadd", "", "Add available Task")
 	p.taskNameDel = flag.String("taskdel", "", "Remove available Task")
 
 	// Timer Logic
@@ -138,16 +137,6 @@ func (p *ParamsDataStruct) RunSystemCommand() {
 // }
 
 // func (p *ParamsDataStruct) RunService() {
-
-// 	// Add TaskName
-// 	if *p.taskNameAdd != "" {
-// 		if *p.taskNameRole == "" {
-// 			log.Fatal("Task Role is not Set")
-// 		}
-// 		log.Info("Add Task Name")
-// 		db_controller.TaskNameAdd(*p.taskNameAdd, *p.taskNameRole)
-// 		return
-// 	}
 
 // 	// Remove TaskName
 // 	if *p.taskNameDel != "" {
