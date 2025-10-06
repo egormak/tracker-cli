@@ -7,9 +7,9 @@ import (
 )
 
 var restSpendCmd = &cobra.Command{
-	Use:   "rest-spend [duration]",
+	Use:   "rest-spend",
 	Short: "Set how much time you spent on rest",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		duration, err := cmd.Flags().GetInt("duration")
 		if err != nil {
