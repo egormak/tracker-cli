@@ -30,6 +30,7 @@ func init() {
 		},
 	}
 	planPercentCmd.PersistentFlags().Duration("delay", 15*time.Second, "Delay before starting the task timer")
+	planPercentCmd.PersistentFlags().IntP("rest-limit", "r", -1, "Maximum rest minutes before stopping; negative disables continuous mode")
 
 	planPercentSetCmd := &cobra.Command{
 		Use:   "set",
@@ -68,7 +69,12 @@ func runPlanPercent(cmd *cobra.Command) error {
 		return err
 	}
 
-	return plan.RunPercent(delay)
+	restLimit, err := cmd.Flags().GetInt("rest-limit")
+	if err != nil {
+		return err
+	}
+
+	return plan.RunPercent(delay, restLimit)
 }
 
 func parsePercentValues(raw []string) ([]int, error) {

@@ -1,18 +1,66 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service"
 	"tracker_cli/internal/service/task"
 )
 
 // RunPercent triggers the next task from the percent plan queue.
-func RunPercent(delay time.Duration) error {
+func RunPercent(delay time.Duration, restLimitMinutes int) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	logger := interruptLogger(ctx)
+
+	if restLimitMinutes < 0 {
+		if logger() {
+			return nil
+		}
+		if err := runPercentOnce(delay); err != nil {
+			return err
+		}
+		if logger() {
+			return nil
+		}
+		return nil
+	}
+
+	limitUnits := restutil.UnitsFromMinutes(restLimitMinutes)
+
+	for {
+		if logger() {
+			return nil
+		}
+
+		restUnits, err := api.GetRestTime()
+		if err != nil {
+			return fmt.Errorf("fetch rest balance: %w", err)
+		}
+
+		currentMinutes := restutil.MinutesFromUnits(restUnits)
+		if restUnits > limitUnits {
+			slog.Info("rest limit reached", "rest_minutes", currentMinutes, "limit_minutes", restLimitMinutes)
+			return nil
+		}
+
+		if err := runPercentOnce(delay); err != nil {
+			return err
+		}
+	}
+}
+
+func runPercentOnce(delay time.Duration) error {
 	if delay < 0 {
 		delay = 0
 	}
@@ -43,4 +91,21 @@ func RunPercent(delay time.Duration) error {
 	}
 
 	return nil
+}
+
+func interruptLogger(ctx context.Context) func() bool {
+	var logged bool
+
+	return func() bool {
+		if ctx.Err() == nil {
+			return false
+		}
+
+		if !logged {
+			slog.Info("plan percent interrupted")
+			logged = true
+		}
+
+		return true
+	}
 }

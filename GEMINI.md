@@ -38,6 +38,7 @@ tracker [command]
 
 -   `tracker clean`: Run Clean.
 -   `tracker rest-spend -d [duration]`: Set how much time you spent on rest.
+-   `tracker timer-recheck`: Recheck timers and refresh the timer list.
 -   `tracker statistic`: Show statistic.
 -   `tracker task -n [task-name]`: Run Task.
 -   `tracker taskadd -n [task-name] -r [task-role]`: Add a new task with a role.

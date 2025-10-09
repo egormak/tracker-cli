@@ -24,7 +24,6 @@ type ParamsDataStruct struct {
 	taskRecordAdd *bool
 	timer         *int
 	timerListSet  *int
-	timerRecheck  *bool
 }
 
 func NewParams() (*ParamsDataStruct, error) {
@@ -43,7 +42,6 @@ func NewParams() (*ParamsDataStruct, error) {
 
 	// Timer Logic
 	p.timerListSet = flag.Int("timerlistset", 0, "Create Timer List with Count")
-	p.timerRecheck = flag.Bool("timerrecheck", false, "Timer List Recheck")
 
 	// Sub Command
 	p.priority = flag.Int("priority", 0, "Set Task Priority")
@@ -72,11 +70,6 @@ func (p *ParamsDataStruct) RunSystemCommand() {
 		os.Exit(0)
 	}
 
-	// Time Recheck
-	if *p.timerRecheck {
-		timer.TimerRecheck()
-		os.Exit(0)
-	}
 	// Configure Task
 	if *p.taskConfig {
 		if *p.taskName == "" {

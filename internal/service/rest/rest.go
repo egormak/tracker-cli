@@ -7,7 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
 	"tracker_cli/config"
+	"tracker_cli/internal/pkg/restutil"
+	"tracker_cli/internal/repository/api"
 )
 
 func RestSpend(restTime int) {
@@ -70,28 +73,11 @@ func RestAdd(restTime int) {
 
 func RestShow() {
 
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/rest-get"), nil)
+	restUnits, err := api.GetRestTime()
 	if err != nil {
 		slog.Error("request error", "error", err)
-	}
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-	// Request
-	resp, err := client.Do(request)
-	if err != nil {
-		slog.Error("request error", "error", err)
-	}
-	if resp.StatusCode != 200 {
-		slog.Error("request error", "status code", resp.StatusCode)
+		return
 	}
 
-	var restTime map[string]int
-	err = json.NewDecoder(resp.Body).Decode(&restTime)
-	if err != nil {
-		slog.Error("failed to decode response: %w", err)
-	}
-
-	fmt.Println("Rest Earn: ", float64(restTime["rest_time"])/100)
+	fmt.Println("Rest Earn: ", restutil.MinutesFromUnits(restUnits))
 }
