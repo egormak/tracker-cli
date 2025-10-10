@@ -183,7 +183,7 @@ func formatDuration(d time.Duration) string {
 
 func (t *TaskTimer) Run() error {
 	model := newTeaTimerModel(t)
-	program := tea.NewProgram(model, tea.WithAltScreen())
+	program := tea.NewProgram(model)
 
 	result, err := program.Run()
 	if err != nil {

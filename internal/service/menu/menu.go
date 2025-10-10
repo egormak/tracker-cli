@@ -55,6 +55,7 @@ func RunMenu() string {
 		{Title: "Priority", Width: 10},
 		{Title: "Duration", Width: 10},
 		{Title: "Done", Width: 5},
+		{Title: "% Done", Width: 7},
 		{Title: "Left", Width: 5},
 	}
 
@@ -144,7 +145,20 @@ func GetRows() []table.Row {
 	sort.Slice(tasksInfo, func(i, j int) bool { return tasksInfo[i].Priority > tasksInfo[j].Priority })
 
 	for _, task := range tasksInfo {
-		rows = append(rows, table.Row{task.Name, task.Role, strconv.Itoa(task.Priority), strconv.Itoa(task.Duration), strconv.Itoa(task.Done), strconv.Itoa(task.Duration - task.Done)})
+		percentDone := "0%"
+		if task.Duration > 0 {
+			value := float64(task.Done) / float64(task.Duration) * 100
+			percentDone = fmt.Sprintf("%.0f%%", value)
+		}
+		rows = append(rows, table.Row{
+			task.Name,
+			task.Role,
+			strconv.Itoa(task.Priority),
+			strconv.Itoa(task.Duration),
+			strconv.Itoa(task.Done),
+			percentDone,
+			strconv.Itoa(task.Duration - task.Done),
+		})
 	}
 
 	return rows
