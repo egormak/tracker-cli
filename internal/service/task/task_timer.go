@@ -282,6 +282,10 @@ func (t *TaskTimer) started() bool {
 	return !t.TimeBegin.IsZero()
 }
 
+func (t *TaskTimer) SetRestLimitActive(active bool) {
+	t.restLimitActive = active
+}
+
 func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 	if !t.started() {
 		slog.Info("task timer exited before start", "task", t.Name)
@@ -301,18 +305,20 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 			notifyMessage = message
 		}
 
-		if restUnits, err := api.GetRestTime(); err != nil {
-			slog.Error("failed to fetch rest balance for notification", "error", err)
-		} else {
-			restMinutes := restutil.MinutesFromUnits(restUnits)
-			if restMinutes > 0 {
-				restStatement := fmt.Sprintf("Rest balance %.1f minutes. Time to rest or do some exercise.", restMinutes)
-				if notifyMessage != "" {
-					notifyMessage = fmt.Sprintf("%s %s", notifyMessage, restStatement)
-				} else if t.Percent > 0 {
-					notifyMessage = fmt.Sprintf("Completed planned task '%s' (%d%%). %s", t.Name, t.Percent, restStatement)
-				} else {
-					notifyMessage = fmt.Sprintf("Completed task '%s'. %s", t.Name, restStatement)
+		if !t.restLimitActive {
+			if restUnits, err := api.GetRestTime(); err != nil {
+				slog.Error("failed to fetch rest balance for notification", "error", err)
+			} else {
+				restMinutes := restutil.MinutesFromUnits(restUnits)
+				if restMinutes > 0 {
+					restStatement := fmt.Sprintf("Rest balance %.1f minutes. Time to rest or do some exercise.", restMinutes)
+					if notifyMessage != "" {
+						notifyMessage = fmt.Sprintf("%s %s", notifyMessage, restStatement)
+					} else if t.Percent > 0 {
+						notifyMessage = fmt.Sprintf("Completed planned task '%s' (%d%%). %s", t.Name, t.Percent, restStatement)
+					} else {
+						notifyMessage = fmt.Sprintf("Completed task '%s'. %s", t.Name, restStatement)
+					}
 				}
 			}
 		}

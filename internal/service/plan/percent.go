@@ -28,7 +28,7 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 		if logger() {
 			return nil
 		}
-		if err := runPercentOnce(ctx, delay); err != nil {
+		if err := runPercentOnce(ctx, delay, false); err != nil {
 			if errors.Is(err, task.ErrTaskAborted) {
 				return nil
 			}
@@ -59,7 +59,7 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 			return nil
 		}
 
-		if err := runPercentOnce(ctx, delay); err != nil {
+		if err := runPercentOnce(ctx, delay, true); err != nil {
 			if errors.Is(err, task.ErrTaskAborted) {
 				return nil
 			}
@@ -68,7 +68,7 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 	}
 }
 
-func runPercentOnce(ctx context.Context, delay time.Duration) error {
+func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bool) error {
 	if delay < 0 {
 		delay = 0
 	}
@@ -87,6 +87,7 @@ func runPercentOnce(ctx context.Context, delay time.Duration) error {
 		}
 		return fmt.Errorf("initialise task timer: %w", err)
 	}
+	timer.SetRestLimitActive(restLimitActive)
 
 	slog.Info("starting planned task", "task", name, "percent", percent, "duration", timeDuration)
 
