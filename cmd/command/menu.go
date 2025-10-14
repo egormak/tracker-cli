@@ -46,7 +46,14 @@ var menuCmd = &cobra.Command{
 		}
 
 		slog.Info("Starting task from menu selection", "task", selectedTask, "minutes", taskTimer.TimeDuration, "percent", percent)
-		return taskTimer.Run()
+		if err := taskTimer.Run(); err != nil {
+			if errors.Is(err, task.ErrTaskAborted) {
+				slog.Info("Task aborted from menu", "task", selectedTask)
+				return nil
+			}
+			return err
+		}
+		return nil
 	},
 }
 

@@ -3,6 +3,8 @@ package task
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	bubblestimer "github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
@@ -18,10 +21,16 @@ import (
 	"tracker_cli/internal/service/timer"
 )
 
+const (
+	// timeFormat is the display format for task completion time in Telegram
+	timeFormat = "2 January 2006 15:04"
+)
+
 type timerKeymap struct {
 	pause key.Binding
 	stop  key.Binding
 	quit  key.Binding
+	abort key.Binding
 	help  key.Binding
 }
 
@@ -36,8 +45,12 @@ func newTimerKeymap() timerKeymap {
 			key.WithHelp("enter", "stop & save"),
 		),
 		quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
-			key.WithHelp("q", "quit without saving"),
+			key.WithKeys("q"),
+			key.WithHelp("q", "quit & save"),
+		),
+		abort: key.NewBinding(
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "quit & save, abort plan"),
 		),
 		help: key.NewBinding(
 			key.WithKeys("h"),
@@ -47,16 +60,23 @@ func newTimerKeymap() timerKeymap {
 }
 
 type teaTimerModel struct {
-	timer      bubblestimer.Model
-	keymap     timerKeymap
-	duration   time.Duration
-	elapsed    time.Duration
-	quit       bool
-	task       *TaskTimer
-	sendResult bool
-	completed  bool
-	showHelp   bool
+	timer     bubblestimer.Model
+	keymap    timerKeymap
+	duration  time.Duration
+	elapsed   time.Duration
+	task      *TaskTimer
+	exitState exitState
+	showHelp  bool
 }
+
+// exitState represents the state when the timer exits
+type exitState struct {
+	shouldSave bool
+	abortPlan  bool
+	completed  bool
+}
+
+type interruptMsg struct{}
 
 func newTeaTimerModel(task *TaskTimer) teaTimerModel {
 	duration := time.Duration(task.TimeDuration) * time.Minute
@@ -93,15 +113,21 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case bubblestimer.TimeoutMsg:
 		m.syncElapsed()
-		m.sendResult = true
-		m.completed = true
+		m.exitState = exitState{shouldSave: true, completed: true, abortPlan: false}
+		return m, tea.Quit
+	case interruptMsg:
+		m.syncElapsed()
+		m.exitState = exitState{shouldSave: true, completed: false, abortPlan: true}
 		return m, tea.Quit
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.quit):
 			m.syncElapsed()
-			m.sendResult = true
-			m.quit = true
+			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: false}
+			return m, tea.Quit
+		case key.Matches(msg, m.keymap.abort):
+			m.syncElapsed()
+			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: true}
 			return m, tea.Quit
 		case key.Matches(msg, m.keymap.pause):
 			return m, m.timer.Toggle()
@@ -110,7 +136,7 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.syncElapsed()
-			m.sendResult = true
+			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: false}
 			return m, tea.Quit
 		case key.Matches(msg, m.keymap.help):
 			m.showHelp = !m.showHelp
@@ -121,19 +147,8 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m teaTimerModel) View() string {
-	status := "paused"
-	if m.timer.Running() {
-		status = "running"
-	} else if m.timer.Timedout() {
-		status = "completed"
-	} else if m.quit {
-		status = "quitting"
-	}
-
-	remaining := m.duration - m.elapsed
-	if remaining < 0 {
-		remaining = 0
-	}
+	status := m.getStatus()
+	remaining := m.getRemainingTime()
 
 	view := fmt.Sprintf(
 		"Task: %s\nStatus: %s\nElapsed: %s\nRemaining: %s\n\n",
@@ -148,19 +163,43 @@ func (m teaTimerModel) View() string {
 	return view
 }
 
+// getStatus returns the current timer status as a string
+func (m teaTimerModel) getStatus() string {
+	if m.timer.Timedout() {
+		return "completed"
+	}
+	if m.exitState.shouldSave {
+		return "quitting"
+	}
+	if m.timer.Running() {
+		return "running"
+	}
+	return "paused"
+}
+
+// getRemainingTime calculates and clamps the remaining time
+func (m teaTimerModel) getRemainingTime() time.Duration {
+	remaining := m.duration - m.elapsed
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
+}
+
 func (m teaTimerModel) instructions() string {
 	if m.showHelp {
 		lines := []string{
 			"Controls:",
 			fmt.Sprintf("  %-10s %s", "p", "pause or resume timer"),
 			fmt.Sprintf("  %-10s %s", "enter", "stop timer and save result"),
-			fmt.Sprintf("  %-10s %s", "q / ctrl+c", "quit and save progress"),
+			fmt.Sprintf("  %-10s %s", "q", "quit and save progress"),
+			fmt.Sprintf("  %-10s %s", "ctrl+c", "quit, save, and abort plan"),
 			fmt.Sprintf("  %-10s %s", "h", "toggle this help view"),
 		}
 		return strings.Join(lines, "\n")
 	}
 
-	return "Controls: p pause/resume • enter stop-save • q quit-save • h help"
+	return "Controls: p pause/resume • enter stop-save • q quit-save • ctrl+c abort-plan • h help"
 }
 
 func (m *teaTimerModel) syncElapsed() {
@@ -183,24 +222,51 @@ func formatDuration(d time.Duration) string {
 
 func (t *TaskTimer) Run() error {
 	model := newTeaTimerModel(t)
-	program := tea.NewProgram(model)
+
+	// Create program with signal catching disabled so Bubble Tea handles ctrl+c naturally
+	program := tea.NewProgram(model, tea.WithoutSignalHandler())
+
+	// Set up our own signal handler that works properly with Bubble Tea
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+
+	// Launch signal forwarder in background
+	stopForwarder := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-sigCh:
+				program.Send(interruptMsg{})
+			case <-stopForwarder:
+				return
+			}
+		}
+	}()
 
 	result, err := program.Run()
+	close(stopForwarder) // Signal goroutine to exit
+
 	if err != nil {
-		return err
+		return fmt.Errorf("running timer UI: %w", err)
 	}
 
 	timerResult, ok := result.(teaTimerModel)
 	if !ok {
-		return fmt.Errorf("invalid timer result")
+		return fmt.Errorf("invalid timer result: expected teaTimerModel, got %T", result)
 	}
 
-	if !timerResult.sendResult {
-		slog.Info("timer cancelled", "task", t.Name)
+	// Handle exit state
+	if !timerResult.exitState.shouldSave {
+		slog.Info("timer cancelled without saving", "task", t.Name)
 		return nil
 	}
 
-	t.finalizeSession(timerResult.elapsed, timerResult.completed)
+	t.finalizeSession(timerResult.elapsed, timerResult.exitState.completed)
+
+	if timerResult.exitState.abortPlan {
+		return ErrTaskAborted
+	}
 	return nil
 }
 
@@ -227,8 +293,32 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 
 	if completed {
 		timer.TimeDurationDel(t.TimeDuration)
-		if err := procent.ChangeGroupPlanPercent(); err != nil {
+		notifyMessage := ""
+		if message, err := procent.ChangeGroupPlanPercent(); err != nil {
 			slog.Error("failed to notify percent change", "error", err)
+			notifyMessage = ""
+		} else {
+			notifyMessage = message
+		}
+
+		if restUnits, err := api.GetRestTime(); err != nil {
+			slog.Error("failed to fetch rest balance for notification", "error", err)
+		} else {
+			restMinutes := restutil.MinutesFromUnits(restUnits)
+			if restMinutes > 0 {
+				restStatement := fmt.Sprintf("Rest balance %.1f minutes. Time to rest or do some exercise.", restMinutes)
+				if notifyMessage != "" {
+					notifyMessage = fmt.Sprintf("%s %s", notifyMessage, restStatement)
+				} else if t.Percent > 0 {
+					notifyMessage = fmt.Sprintf("Completed planned task '%s' (%d%%). %s", t.Name, t.Percent, restStatement)
+				} else {
+					notifyMessage = fmt.Sprintf("Completed task '%s'. %s", t.Name, restStatement)
+				}
+			}
+		}
+
+		if msg := strings.TrimSpace(notifyMessage); msg != "" {
+			telegram.TelegramMessageSend(msg)
 		}
 	}
 
@@ -241,5 +331,5 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 	statistic.StatisticFullShow()
 	rest.RestShow()
 
-	telegram.TelegramStopSend(t.Name, t.MsgID, minutesLogged, t.TimeEnd.Format("2 January 2006 15:04"))
+	telegram.TelegramStopSend(t.Name, t.MsgID, minutesLogged, t.TimeEnd.Format(timeFormat))
 }

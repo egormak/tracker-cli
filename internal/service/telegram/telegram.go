@@ -53,7 +53,7 @@ func TelegramStartSend(taskName string) int {
 	}
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 		os.Exit(1)
 	}
 	return result.MsgID
@@ -85,6 +85,43 @@ func TelegramStopSend(taskName string, msgID int, timeDone int, timeEnd string) 
 	}
 
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/manage/telegram/stop"), bytes.NewBuffer(json_data))
+	if err != nil {
+		slog.Error("request error", "error", err)
+		os.Exit(1)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json")
+	resp, err := client.Do(request)
+	if err != nil {
+		slog.Error("request error", "error", err)
+		os.Exit(1)
+	}
+
+	if resp.StatusCode != 200 {
+		slog.Error("request error", "status code", resp.StatusCode)
+		os.Exit(1)
+	}
+}
+
+func TelegramMessageSend(message string) {
+	timeout := time.Duration(15 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	var body struct {
+		Message string `json:"message"`
+	}
+
+	body.Message = message
+
+	json_data, err := json.Marshal(&body)
+	if err != nil {
+		slog.Error("can't marshal JSON", "error", err)
+		os.Exit(1)
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/manage/telegram/message"), bytes.NewBuffer(json_data))
 	if err != nil {
 		slog.Error("request error", "error", err)
 		os.Exit(1)

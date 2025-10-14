@@ -1,7 +1,7 @@
 # Build
 ```shell
-go build -o tracker ./cmd/app/main.go
-sudo mv tracker /usr/local/bin/tracker
+go build -o tasker ./cmd/app/main.go
+sudo mv tasker /usr/local/bin/tasker
 ```
 
 # TODO

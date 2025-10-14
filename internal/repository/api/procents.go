@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"tracker_cli/internal/domain/entity"
 )
 
 type roleProcentsPayload struct {
@@ -35,16 +37,26 @@ func UpdateRoleProcents(role string, percents []int) error {
 }
 
 // TriggerPlanPercentChange requests a refresh of the percent plan on the backend.
-func TriggerPlanPercentChange() error {
+func TriggerPlanPercentChange() (string, error) {
 	respBody, err := sendRequest("GET", "/api/v1/task/plan-percent/change", nil)
 	if err != nil {
-		return fmt.Errorf("trigger plan percent change: %w", err)
+		return "", fmt.Errorf("trigger plan percent change: %w", err)
 	}
 	defer respBody.Close()
 
-	if _, err := io.Copy(io.Discard, respBody); err != nil {
-		return fmt.Errorf("drain change response: %w", err)
+	body, err := io.ReadAll(respBody)
+	if err != nil {
+		return "", fmt.Errorf("read change response: %w", err)
 	}
 
-	return nil
+	if len(body) == 0 {
+		return "", nil
+	}
+
+	var answer entity.Answer
+	if err := json.Unmarshal(body, &answer); err != nil {
+		return "", fmt.Errorf("decode change response: %w", err)
+	}
+
+	return answer.Message, nil
 }

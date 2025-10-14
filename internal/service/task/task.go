@@ -13,6 +13,9 @@ import (
 // ErrTaskCompleted indicates that no time remains for the task
 var ErrTaskCompleted = fmt.Errorf("no time remaining for this task")
 
+// ErrTaskAborted indicates the user aborted the task timer early and requested to stop the current plan.
+var ErrTaskAborted = errors.New("task aborted by user")
+
 func TaskRun(cmd *cobra.Command, args []string) error {
 	taskName, err := cmd.Flags().GetString("name")
 	if err != nil {
@@ -38,7 +41,15 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return taskApp.Run()
+	if err := taskApp.Run(); err != nil {
+		if errors.Is(err, ErrTaskAborted) {
+			slog.Info("task aborted by user", "task", taskName)
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 // CreateTaskTimer initializes a new TaskTimer object with the provided parameters
@@ -56,6 +67,7 @@ func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, e
 		Name:         name,
 		Role:         api.TaskRoleGet(name),
 		TimeDuration: duration,
+		Percent:      percent,
 	}, nil
 }
 
