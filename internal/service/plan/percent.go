@@ -19,6 +19,15 @@ import (
 
 // RunPercent triggers the next task from the percent plan queue.
 func RunPercent(delay time.Duration, restLimitMinutes int) error {
+	return runPercentInternal(delay, restLimitMinutes, false)
+}
+
+// RunPercentSchedule triggers the next task from the percent plan queue with schedule awareness.
+func RunPercentSchedule(delay time.Duration, restLimitMinutes int) error {
+	return runPercentInternal(delay, restLimitMinutes, true)
+}
+
+func runPercentInternal(delay time.Duration, restLimitMinutes int, useSchedule bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -28,7 +37,7 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 		if logger() {
 			return nil
 		}
-		if err := runPercentOnce(ctx, delay, false); err != nil {
+		if err := runPercentOnce(ctx, delay, false, useSchedule); err != nil {
 			if errors.Is(err, task.ErrTaskAborted) {
 				return nil
 			}
@@ -59,7 +68,7 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 			return nil
 		}
 
-		if err := runPercentOnce(ctx, delay, true); err != nil {
+		if err := runPercentOnce(ctx, delay, true, useSchedule); err != nil {
 			if errors.Is(err, task.ErrTaskAborted) {
 				return nil
 			}
@@ -68,17 +77,43 @@ func RunPercent(delay time.Duration, restLimitMinutes int) error {
 	}
 }
 
-func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bool) error {
+func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bool, useSchedule bool) error {
 	if delay < 0 {
 		delay = 0
 	}
 
-	name, percent, err := api.GetTaskByPercentPlan()
-	if err != nil {
-		return fmt.Errorf("fetch next planned task: %w", err)
+	var name string
+	var percent int
+	var sourceDay string
+	var timeDuration int
+	var err error
+
+	if useSchedule {
+		var timeLeft int
+		name, percent, timeLeft, sourceDay, err = api.GetTaskByPercentPlanSchedule()
+		if err != nil {
+			return fmt.Errorf("fetch next scheduled task: %w", err)
+		}
+		if sourceDay != "" {
+			slog.Info("schedule-aware task selected (rollover)", "task", name, "percent", percent, "time_left", timeLeft, "source_day", sourceDay)
+		} else {
+			slog.Info("schedule-aware task selected", "task", name, "percent", percent, "time_left", timeLeft)
+		}
+		// Use the smaller value between timeLeft and default timer duration
+		defaultDuration := service.TimeDurationGet(name)
+		if timeLeft > 0 && timeLeft < defaultDuration {
+			timeDuration = timeLeft
+		} else {
+			timeDuration = defaultDuration
+		}
+	} else {
+		name, percent, err = api.GetTaskByPercentPlan()
+		if err != nil {
+			return fmt.Errorf("fetch next planned task: %w", err)
+		}
+		timeDuration = service.TimeDurationGet(name)
 	}
 
-	timeDuration := service.TimeDurationGet(name)
 	timer, err := task.CreateTaskTimer(name, timeDuration, percent)
 	if err != nil {
 		if errors.Is(err, task.ErrTaskCompleted) {
@@ -87,6 +122,7 @@ func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bo
 		}
 		return fmt.Errorf("initialise task timer: %w", err)
 	}
+	timer.SourceDay = sourceDay
 	timer.SetRestLimitActive(restLimitActive)
 
 	slog.Info("starting planned task", "task", name, "percent", percent, "duration", timeDuration)

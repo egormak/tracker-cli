@@ -30,9 +30,13 @@ func GetTaskParams(taskName string) entity.TaskParams {
 
 }
 
-func AddTaskRecord(taskName string, timeDone int) entity.Answer {
+func AddTaskRecord(taskName string, timeDone int, sourceDay string) entity.Answer {
 
-	taskRecord := entity.TaskRecorcRequest{TaskName: taskName, TimeDone: timeDone}
+	taskRecord := entity.TaskRecorcRequest{
+		TaskName:  taskName,
+		TimeDone:  timeDone,
+		SourceDay: sourceDay,
+	}
 	var result entity.Answer
 
 	json_data, err := json.Marshal(&taskRecord)
@@ -41,7 +45,7 @@ func AddTaskRecord(taskName string, timeDone int) entity.Answer {
 		os.Exit(1)
 	}
 
-	responceBody, err := sendRequest("POST", "/api/v1/record", bytes.NewBuffer(json_data))
+	responceBody, err := sendRequest("POST", "/api/v1/taskrecord", bytes.NewBuffer(json_data))
 
 	if err != nil {
 		slog.Error("request error", "error", err)

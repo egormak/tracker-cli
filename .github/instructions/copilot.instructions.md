@@ -215,11 +215,17 @@ test/
 - **Statistics Display**: Show task-specific and full day statistics
 - **Rest Tracking**: Track and display rest time separately
 - **Percentage Planning**: Support percentage-based task completion planning
-- **API Endpoints**:
-  - `/api/v1/record/task-day?task_name=X`: Get time spent on specific task today
+- **API Endpoints** (Preferred):
   - `/api/v1/task/params?task_name=X`: Get task planning parameters
-  - `/api/v1/record`: POST to record completed time
-  - `/api/v1/records`: GET all task records
+  - `/api/v1/taskrecord`: POST to record completed time (supports source_day for rollover tasks)
+  - `/api/v1/stats/done/today`: GET today's completion statistics
+  - `/api/v1/stats/tasks/today`: GET today's tasks (planned vs done)
+  - `/api/v1/task/plan/percent`: GET next task by percent
+  - `/api/v1/task/plan/percent/schedule`: GET next task with schedule awareness (includes source_day)
+- **Legacy Endpoints** (Deprecated but still supported):
+  - `/api/v1/record/task-day?task_name=X`: Get time spent on specific task today
+  - `/api/v1/record`: POST to record completed time (redirects to /api/v1/taskrecord)
+  - `/api/v1/records`: GET all task records summary
 
 ### Telegram Notifications
 - **Start Notification**: Send task name, receive message ID
@@ -405,10 +411,13 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 - **Base URL**: Configured in `config/config.go` as `TrackerDomain`
 - **Alternative**: Can switch to `http://127.0.0.1:3000` for local development
 
-### API Endpoints (Examples)
+### API Endpoints (Primary)
 - `GET /api/v1/task/params?task_name=X` - Get task parameters
-- `GET /api/v1/record/task-day?task_name=X` - Get today's time for task
-- `POST /api/v1/record` - Record completed task time
+- `POST /api/v1/taskrecord` - Record completed task time (with source_day support)
+- `GET /api/v1/stats/done/today` - Get today's completion statistics
+- `GET /api/v1/stats/tasks/today` - Get today's tasks (planned vs done)
+- `GET /api/v1/task/plan/percent` - Get next task by percent
+- `GET /api/v1/task/plan/percent/schedule` - Get next task with schedule awareness
 - `GET /api/v1/tasklist` - List all tasks with statistics
 - `GET /api/v1/timer/get` - Get default timer duration
 - `POST /api/v1/timer/set` - Set timer count
@@ -416,5 +425,10 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 - `POST /api/v1/manage/telegram/start` - Start Telegram notification
 - `POST /api/v1/manage/telegram/stop` - Stop Telegram notification
 - `GET /api/v1/manage/timer/recheck` - Recheck timer state
+
+### API Endpoints (Legacy - Still Supported)
+- `GET /api/v1/record/task-day?task_name=X` - Get today's time for task (deprecated)
+- `POST /api/v1/record` - Record task time (deprecated, redirects to /api/v1/taskrecord)
+- `GET /api/v1/records` - Get records summary (deprecated)
 
 All API interactions must go through the repository layer to maintain separation of concerns and enable easy testing/mocking.

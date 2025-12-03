@@ -14,8 +14,10 @@ type TaskManager struct {
 }
 
 type TaskPercent struct {
-	Name    string `json:"task_name"`
-	Percent int    `json:"percent"`
+	Name      string `json:"task_name"`
+	Percent   int    `json:"percent"`
+	TimeLeft  int    `json:"time_left"`
+	SourceDay string `json:"source_day,omitempty"` // Optional: day this task is from (for rollover tasks)
 }
 
 type TaskParams struct {
@@ -25,8 +27,9 @@ type TaskParams struct {
 }
 
 type TaskRecorcRequest struct {
-	TaskName string `json:"task_name"`
-	TimeDone int    `json:"time_done"`
+	TaskName  string `json:"task_name"`
+	TimeDone  int    `json:"time_done"`
+	SourceDay string `json:"source_day,omitempty"` // Optional: day to record against (for rollover tasks)
 }
 
 type TaskList struct {

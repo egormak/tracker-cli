@@ -150,9 +150,14 @@ func (m teaTimerModel) View() string {
 	status := m.getStatus()
 	remaining := m.getRemainingTime()
 
+	taskInfo := fmt.Sprintf("Task: %s", m.task.Name)
+	if m.task.SourceDay != "" {
+		taskInfo = fmt.Sprintf("%s (rollover from %s)", taskInfo, m.task.SourceDay)
+	}
+
 	view := fmt.Sprintf(
-		"Task: %s\nStatus: %s\nElapsed: %s\nRemaining: %s\n\n",
-		m.task.Name,
+		"%s\nStatus: %s\nElapsed: %s\nRemaining: %s\n\n",
+		taskInfo,
 		status,
 		formatDuration(m.elapsed),
 		formatDuration(remaining),
@@ -330,7 +335,7 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 
 	minutesLogged := int(t.TimeDone)
 	if minutesLogged > 0 {
-		api.AddTaskRecord(t.Name, minutesLogged)
+		api.AddTaskRecord(t.Name, minutesLogged, t.SourceDay)
 	}
 
 	statistic.StatisticTaskShow(t.Name)

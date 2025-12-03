@@ -29,6 +29,16 @@ func init() {
 			return runPlanPercent(cmd)
 		},
 	}
+
+	planPercentScheduleCmd := &cobra.Command{
+		Use:     "schedule",
+		Aliases: []string{"sched"},
+		Short:   "Start the next task from the percent plan with schedule awareness",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPlanPercentSchedule(cmd)
+		},
+	}
+
 	planPercentCmd.PersistentFlags().Duration("delay", 15*time.Second, "Delay before starting the task timer")
 	planPercentCmd.PersistentFlags().IntP("rest-limit", "r", -1, "Maximum rest minutes before stopping; negative disables continuous mode")
 
@@ -59,6 +69,7 @@ func init() {
 	planPercentSetCmd.MarkFlagRequired("values")
 
 	planPercentCmd.AddCommand(planPercentRunCmd)
+	planPercentCmd.AddCommand(planPercentScheduleCmd)
 	planPercentCmd.AddCommand(planPercentSetCmd)
 	planCmd.AddCommand(planPercentCmd)
 }
@@ -75,6 +86,20 @@ func runPlanPercent(cmd *cobra.Command) error {
 	}
 
 	return plan.RunPercent(delay, restLimit)
+}
+
+func runPlanPercentSchedule(cmd *cobra.Command) error {
+	delay, err := cmd.Flags().GetDuration("delay")
+	if err != nil {
+		return err
+	}
+
+	restLimit, err := cmd.Flags().GetInt("rest-limit")
+	if err != nil {
+		return err
+	}
+
+	return plan.RunPercentSchedule(delay, restLimit)
 }
 
 func parsePercentValues(raw []string) ([]int, error) {

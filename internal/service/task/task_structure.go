@@ -11,5 +11,6 @@ type TaskTimer struct {
 	TimeDone        float64
 	Percent         int
 	MsgID           int
+	SourceDay       string // Optional: day this task is from (for rollover tasks)
 	restLimitActive bool
 }

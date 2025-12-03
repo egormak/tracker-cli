@@ -16,6 +16,7 @@ func init() {
 	taskCmd.Flags().StringP("name", "n", "", "Task Name")
 	taskCmd.Flags().IntP("time", "t", 0, "Time Duration")
 	taskCmd.Flags().IntP("percent", "p", 100, "Percent of task time")
+	taskCmd.Flags().StringP("source-day", "s", "", "Source day (for rollover tasks: monday, tuesday, etc.)")
 
 	taskCmd.MarkFlagRequired("name")
 

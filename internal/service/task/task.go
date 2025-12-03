@@ -32,6 +32,11 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read task percent flag: %w", err)
 	}
 
+	sourceDay, err := cmd.Flags().GetString("source-day")
+	if err != nil {
+		return fmt.Errorf("read source day flag: %w", err)
+	}
+
 	taskApp, err := CreateTaskTimer(taskName, taskTime, taskPercent)
 	if err != nil {
 		if errors.Is(err, ErrTaskCompleted) {
@@ -39,6 +44,11 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 		return err
+	}
+
+	// Set source day if provided
+	if sourceDay != "" {
+		taskApp.SourceDay = sourceDay
 	}
 
 	if err := taskApp.Run(); err != nil {
