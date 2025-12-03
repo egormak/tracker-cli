@@ -30,7 +30,7 @@ tracker [command]
 
 ### Backend Requirements
 
-The application requires a backend service running. By default, it connects to `http://127.0.0.1:3000` as configured in `config/config.go`. You can change this to point to your actual backend server.
+The application requires a backend service running. The backend URL is configured in `config/config.go`. Currently set to `http://127.0.0.1:3000` for local development. Production URL `http://tracker.makegorka.com:8080` is available but commented out. Switch between them as needed.
 
 ```shell
 # Run MongoDB for local development (if you're running the backend locally)
@@ -58,17 +58,29 @@ The codebase follows a clean architecture pattern with the following main compon
 3. **Service Layer (`internal/service/`)**
    - Business logic for each feature area
    - `task/`: Task management functionality including interactive timer
+   - `task_params/`: Task parameters management (time, priority)
    - `menu/`: Interactive menu for task selection
    - `statistic/`: Statistics gathering and display
    - `procent/`: Percentage calculation and management
    - `rest/`: Rest time tracking
    - `telegram/`: Telegram notifications
    - `timer/`: Timer management
+   - `role/`: Role management
+   - `plan/`: Planning features
+   - `manager/`: Cleanup and management tasks
 
 4. **Repository Layer (`internal/repository/`)**
    - `api/`: Handles REST API calls to the backend service
+   - All API communication goes through the centralized `sendRequest()` function in `api.go`
 
-5. **Utilities (`internal/pkg/`)**
+5. **Domain Layer (`internal/domain/`)**
+   - `entity/`: Core business entities (task, role, statistic, timer, general)
+   - `repository/`: Repository interfaces (currently empty, implementations in internal/repository/api)
+
+6. **Interface Layer (`internal/interface/`)**
+   - `cli/`: CLI interface utilities (currently empty)
+
+7. **Utilities (`internal/pkg/`)**
    - `day_method/`: Date-related utilities
    - `restutil/`: Rest-related utilities
 
@@ -111,9 +123,53 @@ The application uses Bubble Tea for interactive TUI components:
 
 All data is stored and retrieved via REST API calls to the backend:
 
-- Base URL is configured in `config/config.go` (default: `http://127.0.0.1:3000`)
+- Base URL is configured in `config/config.go` (current: `http://127.0.0.1:3000`)
 - API calls are implemented in `internal/repository/api/*.go`
 - Standard HTTP client with JSON serialization/deserialization
+- Centralized `sendRequest()` function in `internal/repository/api/api.go` handles all HTTP requests
+- 15-second timeout on all requests
+- Proper error handling with structured logging
+
+### Key API Endpoints
+
+**Task Management:**
+- `GET /api/v1/task/params?task_name=X` - Get task planning parameters
+- `POST /api/v1/taskrecord` - Record completed task time
+- `GET /api/v1/records` - Get all task records
+- `GET /api/v1/tasklist` - List all tasks with statistics
+- `GET /api/v1/record/task-day?task_name=X` - Get time spent on task today
+- `GET /api/v1/record/params?task_name=X` - Get task parameters
+- `POST /api/v1/record/params` - Set task parameters
+
+**Statistics:**
+- `GET /api/v1/stats/done/today` - Today's completion statistics
+- `GET /api/v1/stats/tasks/today` - Today's tasks (planned vs done)
+
+**Planning:**
+- `GET /api/v1/task/plan-percent` - Get next task by percent
+- `GET /api/v1/task/plan/percent/schedule` - Get next task with schedule awareness
+- `GET /api/v1/task/plan-percent/change` - Change percent plan
+- `POST /api/v1/manage/procents` - Manage percents
+
+**Timer Management:**
+- `GET /api/v1/timer/get` - Get default timer duration
+- `POST /api/v1/timer/set` - Set timer count
+- `POST /api/v1/timer/del` - Delete timer count
+- `GET /api/v1/manage/timer/recheck` - Recheck timer state
+
+**Role Management:**
+- `GET /api/v1/role/get?task_name=X` - Get task role
+- `GET /api/v1/roles/records` - Get all roles
+
+**Rest Time:**
+- `GET /api/v1/rest-get` - Get rest time
+
+**Telegram Notifications:**
+- `POST /api/v1/manage/telegram/start` - Start notification
+- `POST /api/v1/manage/telegram/stop` - Stop notification
+
+**Cleanup:**
+- `GET /api/v1/records/clean` - Clean records
 
 ## Tips for Development
 

@@ -33,7 +33,7 @@ internal/
 │   │   ├── statistic.go  # TaskTimeDurationResponse
 │   │   ├── timers.go     # Timer-related entities
 │   │   └── general.go    # General/shared entities
-│   └── repository/       # Repository interfaces (contracts)
+│   └── repository/       # Repository interfaces (currently empty)
 ├── repository/
 │   └── api/              # External API communication implementations
 │       ├── api.go        # sendRequest() - centralized HTTP client
@@ -42,6 +42,8 @@ internal/
 │       ├── role.go       # TaskRoleGet
 │       ├── timer.go      # Timer-related API calls
 │       ├── plan_percent.go # Percentage planning API
+│       ├── procents.go   # Percentage management
+│       ├── rest.go       # Rest time API
 │       └── clean_data.go # Data cleanup operations
 ├── service/              # Business logic layer
 │   ├── task/            # Task management services
@@ -49,28 +51,27 @@ internal/
 │   │   ├── task_timer.go # TaskTimer.Run(), Start(), Stop()
 │   │   ├── task_structure.go # TaskTimer struct definition
 │   │   └── task_methods.go # Task helper methods
-│   ├── timer/           # Timer management
+│   ├── task_params/     # Task parameters management (time, priority)
+│   ├── timer/           # Timer management (2 files: timer.go and ../timer.go)
 │   ├── telegram/        # Telegram notification integration
 │   ├── statistic/       # Statistics calculation and display
+│   │   ├── statistic.go # Main statistics logic
+│   │   └── tasklist.go  # Task list display
 │   ├── rest/            # Rest time tracking
 │   ├── menu/            # Interactive Bubble Tea menu
 │   │   ├── menu.go     # RunMenu() - interactive task selector
 │   │   └── const_values.go # Menu constants
 │   ├── plan/            # Planning features
 │   ├── procent/         # Percentage calculations
+│   │   ├── set.go      # Set percentages
+│   │   └── change.go   # Change percentages
 │   ├── role/            # Role management
 │   └── manager/         # Cleanup and management tasks
-├── application/         # Application-level services
-│   ├── service/        # Application services
-│   └── errors/         # Custom error types
-├── infrastructure/      # Infrastructure adapters
-│   ├── api/           # API infrastructure
-│   └── repository/    # Repository implementations
 ├── interface/
-│   └── cli/           # CLI interface utilities
-│       └── cli.go
+│   └── cli/           # CLI interface utilities (currently empty)
 └── pkg/               # Shared utilities
-    └── day_method/    # Day-related utility functions
+    ├── day_method/    # Day-related utility functions
+    └── restutil/      # Rest-related utilities
 
 config/
 └── config.go          # TrackerDomain constant configuration
@@ -237,8 +238,9 @@ test/
 
 ### Configuration
 - Centralize configuration in `config/config.go`
-- Use const for TrackerDomain: `http://tracker.makegorka.com:8080`
-- Comment out alternative endpoints (e.g., localhost for development)
+- Current TrackerDomain: `http://127.0.0.1:3000` (local development)
+- Production endpoint available (commented out): `http://tracker.makegorka.com:8080`
+- Switch between endpoints by commenting/uncommenting in config.go
 - No environment variables or config files currently used
 
 ### Testing
@@ -406,18 +408,20 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 ## External Dependencies
 
 ### Primary Tracker Service
-- **Domain**: `tracker.makegorka.com:8080`
+- **Current Domain**: `http://127.0.0.1:3000` (local development, active in config)
+- **Production Domain**: `http://tracker.makegorka.com:8080` (commented out in config)
 - **Protocol**: HTTP (not HTTPS)
 - **Base URL**: Configured in `config/config.go` as `TrackerDomain`
-- **Alternative**: Can switch to `http://127.0.0.1:3000` for local development
 
-### API Endpoints (Primary)
+### API Endpoints (Primary - Preferred)
 - `GET /api/v1/task/params?task_name=X` - Get task parameters
 - `POST /api/v1/taskrecord` - Record completed task time (with source_day support)
 - `GET /api/v1/stats/done/today` - Get today's completion statistics
 - `GET /api/v1/stats/tasks/today` - Get today's tasks (planned vs done)
 - `GET /api/v1/task/plan/percent` - Get next task by percent
 - `GET /api/v1/task/plan/percent/schedule` - Get next task with schedule awareness
+- `GET /api/v1/task/plan-percent/change` - Change percent plan
+- `POST /api/v1/manage/procents` - Manage percents
 - `GET /api/v1/tasklist` - List all tasks with statistics
 - `GET /api/v1/timer/get` - Get default timer duration
 - `POST /api/v1/timer/set` - Set timer count
@@ -425,10 +429,19 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 - `POST /api/v1/manage/telegram/start` - Start Telegram notification
 - `POST /api/v1/manage/telegram/stop` - Stop Telegram notification
 - `GET /api/v1/manage/timer/recheck` - Recheck timer state
+- `GET /api/v1/role/get?task_name=X` - Get task role
+- `GET /api/v1/roles/records` - Get all roles
+- `GET /api/v1/rest-get` - Get rest time
+- `GET /api/v1/records/clean` - Clean records
+
+### API Endpoints (Task Parameters - task_params service)
+- `GET /api/v1/record/params?task_name=X` - Get task parameters (time, priority)
+- `POST /api/v1/record/params` - Set task parameters (time_duration, priority)
 
 ### API Endpoints (Legacy - Still Supported)
-- `GET /api/v1/record/task-day?task_name=X` - Get today's time for task (deprecated)
+- `GET /api/v1/record/task-day?task_name=X` - Get today's time for task (deprecated, use /api/v1/task/params)
 - `POST /api/v1/record` - Record task time (deprecated, redirects to /api/v1/taskrecord)
 - `GET /api/v1/records` - Get records summary (deprecated)
+- `GET /api/v1/task/plan-percent` - Old percent planning endpoint (use /api/v1/task/plan/percent/schedule)
 
 All API interactions must go through the repository layer to maintain separation of concerns and enable easy testing/mocking.
