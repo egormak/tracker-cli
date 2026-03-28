@@ -39,3 +39,21 @@ func GetTaskByPercentPlanSchedule() (string, int, int, string, error) {
 
 	return result.Name, result.Percent, result.TimeLeft, result.SourceDay, nil
 }
+
+// GetTaskByNameSchedule gets a specific task by name with schedule awareness.
+// Returns percent, time left (in minutes), source_day, and error if any.
+func GetTaskByNameSchedule(taskName string) (int, int, string, error) {
+	var result entity.TaskPercent
+
+	responseBody, err := sendRequest("GET", fmt.Sprintf("/api/v1/task/plan/percent/schedule?task_name=%s", taskName), nil)
+	if err != nil {
+		return 0, 0, "", fmt.Errorf("request schedule-aware task by name: %w", err)
+	}
+	defer responseBody.Close()
+
+	if err := json.NewDecoder(responseBody).Decode(&result); err != nil {
+		return 0, 0, "", fmt.Errorf("decode schedule task response: %w", err)
+	}
+
+	return result.Percent, result.TimeLeft, result.SourceDay, nil
+}

@@ -32,6 +32,7 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 
 - `tracker menu` - Interactive menu to select and start tasks
 - `tracker task -n "name" [-t time] [-p percent]` - Run a task timer
+- `tracker task -n "name" --previous-days` - Run a task from previous days with schedule awareness (searches Monday to today)
 - `tracker taskadd` - Add a new task
 - `tracker tasklist` - List all tasks
 - `tracker statistic` - Show statistics for the day

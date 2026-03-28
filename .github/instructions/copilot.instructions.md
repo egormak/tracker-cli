@@ -397,6 +397,7 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 ## Available Commands
 
 - `tracker task -n "name" [-t time] [-p percent]` - Run a task timer
+- `tracker task -n "name" --previous-days` - Run a task from previous days with schedule awareness (searches Monday to today, similar to `plan percent schedule` but for a specific task)
 - `tracker taskadd` - Add a new task (interactive or with flags)
 - `tracker tasklist` - List all tasks
 - `tracker statistic` - Show statistics for the day
@@ -420,6 +421,7 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 - `GET /api/v1/stats/tasks/today` - Get today's tasks (planned vs done)
 - `GET /api/v1/task/plan/percent` - Get next task by percent
 - `GET /api/v1/task/plan/percent/schedule` - Get next task with schedule awareness
+- `GET /api/v1/task/plan/percent/schedule?task_name=X` - Get specific task with schedule awareness (searches Monday to today)
 - `GET /api/v1/task/plan-percent/change` - Change percent plan
 - `POST /api/v1/manage/procents` - Manage percents
 - `GET /api/v1/tasklist` - List all tasks with statistics
