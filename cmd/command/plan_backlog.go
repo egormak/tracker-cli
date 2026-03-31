@@ -10,7 +10,7 @@ import (
 var planBacklogCmd = &cobra.Command{
 	Use:     "backlog",
 	Aliases: []string{"catchup", "game"},
-	Short:   "Start sequencing through past deficit tasks",
+	Short:   "Start sequencing through all deficit tasks (past and today)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		delay, err := cmd.Flags().GetDuration("delay")
 		if err != nil {
