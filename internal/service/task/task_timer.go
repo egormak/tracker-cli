@@ -9,16 +9,15 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
-	bubblestimer "github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/statistic"
 	"tracker_cli/internal/service/telegram"
-	"tracker_cli/internal/service/timer"
 )
 
 const (
@@ -60,16 +59,35 @@ func newTimerKeymap() timerKeymap {
 }
 
 type teaTimerModel struct {
-	timer     bubblestimer.Model
-	keymap    timerKeymap
-	duration  time.Duration
-	elapsed   time.Duration
-	task      *TaskTimer
-	exitState exitState
-	showHelp  bool
+	keymap      timerKeymap
+	duration    time.Duration
+	elapsed     time.Duration
+	accumulated time.Duration
+	startTime   time.Time
+	isRunning   bool
+	task        *TaskTimer
+	exitState   exitState
+	showHelp    bool
 }
 
-// exitState represents the state when the timer exits
+type statusPollMsg struct {
+	task entity.RunningTask
+	err  error
+}
+
+type smoothTickMsg time.Time
+
+type togglePauseResultMsg struct {
+	task entity.RunningTask
+	err  error
+}
+
+type stopTaskResultMsg struct {
+	record    entity.TaskRecord
+	abortPlan bool
+	err       error
+}
+
 type exitState struct {
 	shouldSave bool
 	abortPlan  bool
@@ -78,66 +96,115 @@ type exitState struct {
 
 type interruptMsg struct{}
 
-func newTeaTimerModel(task *TaskTimer) teaTimerModel {
-	duration := time.Duration(task.TimeDuration) * time.Minute
-	timerModel := bubblestimer.NewWithInterval(duration, time.Second)
+func pollStatusCmd() tea.Cmd {
+	return tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg {
+		status, err := api.GetRunningTaskStatus()
+		return statusPollMsg{task: status, err: err}
+	})
+}
 
+func smoothTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return smoothTickMsg(t)
+	})
+}
+
+func togglePauseCmd(currentlyRunning bool) tea.Cmd {
+	return func() tea.Msg {
+		var task entity.RunningTask
+		var err error
+		if currentlyRunning {
+			task, err = api.PauseRunningTask()
+		} else {
+			task, err = api.ResumeRunningTask()
+		}
+		return togglePauseResultMsg{task: task, err: err}
+	}
+}
+
+func stopTaskCmd(abortPlan bool) tea.Cmd {
+	return func() tea.Msg {
+		record, err := api.StopRunningTask()
+		return stopTaskResultMsg{record: record, abortPlan: abortPlan, err: err}
+	}
+}
+
+func newTeaTimerModel(task *TaskTimer, runningTask entity.RunningTask) teaTimerModel {
+	duration := time.Duration(task.TimeDuration) * time.Minute
 	return teaTimerModel{
-		timer:    timerModel,
-		keymap:   newTimerKeymap(),
-		duration: duration,
-		task:     task,
+		keymap:      newTimerKeymap(),
+		duration:    duration,
+		task:        task,
+		isRunning:   runningTask.IsRunning,
+		accumulated: time.Duration(runningTask.Accumulated) * time.Minute,
+		startTime:   runningTask.StartTime,
 	}
 }
 
 func (m teaTimerModel) Init() tea.Cmd {
-	m.syncElapsed()
-	m.task.beginSession()
-	return m.timer.Init()
+	m.task.beginSession(m.startTime)
+	return tea.Batch(pollStatusCmd(), smoothTickCmd())
 }
 
 func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case bubblestimer.TickMsg:
-		var cmd tea.Cmd
-		m.timer, cmd = m.timer.Update(msg)
-		m.syncElapsed()
-		return m, cmd
-	case bubblestimer.StartStopMsg:
-		var cmd tea.Cmd
-		m.timer, cmd = m.timer.Update(msg)
-		if m.timer.Running() {
-			m.task.beginSession()
+	case smoothTickMsg:
+		m.updateElapsed()
+		return m, smoothTickCmd()
+
+	case statusPollMsg:
+		if msg.err != nil {
+			slog.Error("Failed to fetch running task status from server", "error", msg.err)
+			return m, tea.Quit
 		}
-		m.syncElapsed()
-		return m, cmd
-	case bubblestimer.TimeoutMsg:
-		m.syncElapsed()
-		m.exitState = exitState{shouldSave: true, completed: true, abortPlan: false}
+		if msg.task.TaskName == "" || msg.task.TaskName != m.task.Name {
+			// Task was stopped or completed from another service!
+			m.exitState = exitState{shouldSave: false, completed: true, abortPlan: false}
+			return m, tea.Quit
+		}
+		m.isRunning = msg.task.IsRunning
+		m.accumulated = time.Duration(msg.task.Accumulated) * time.Minute
+		m.startTime = msg.task.StartTime
+		m.updateElapsed()
+		return m, pollStatusCmd()
+
+	case togglePauseResultMsg:
+		if msg.err != nil {
+			slog.Error("Failed to toggle pause on server", "error", msg.err)
+			return m, nil
+		}
+		m.isRunning = msg.task.IsRunning
+		m.accumulated = time.Duration(msg.task.Accumulated) * time.Minute
+		m.startTime = msg.task.StartTime
+		m.updateElapsed()
+		return m, nil
+
+	case stopTaskResultMsg:
+		if msg.err != nil {
+			slog.Error("Failed to stop running task on server", "error", msg.err)
+			return m, tea.Quit
+		}
+		m.task.TimeEnd = time.Now()
+		m.task.TimeDone = float64(msg.record.TimeDuration)
+		m.exitState = exitState{shouldSave: true, completed: m.elapsed >= m.duration, abortPlan: msg.abortPlan}
 		return m, tea.Quit
+
 	case interruptMsg:
-		m.syncElapsed()
-		m.exitState = exitState{shouldSave: true, completed: false, abortPlan: true}
-		return m, tea.Quit
+		return m, stopTaskCmd(true)
+
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.quit):
-			m.syncElapsed()
-			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: false}
-			return m, tea.Quit
+			return m, stopTaskCmd(false)
 		case key.Matches(msg, m.keymap.abort):
-			m.syncElapsed()
-			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: true}
-			return m, tea.Quit
+			return m, stopTaskCmd(true)
 		case key.Matches(msg, m.keymap.pause):
-			return m, m.timer.Toggle()
+			return m, togglePauseCmd(m.isRunning)
 		case key.Matches(msg, m.keymap.stop):
 			if !m.task.started() {
 				return m, nil
 			}
-			m.syncElapsed()
-			m.exitState = exitState{shouldSave: true, completed: false, abortPlan: false}
-			return m, tea.Quit
+			return m, stopTaskCmd(false)
 		case key.Matches(msg, m.keymap.help):
 			m.showHelp = !m.showHelp
 			return m, nil
@@ -168,29 +235,6 @@ func (m teaTimerModel) View() string {
 	return view
 }
 
-// getStatus returns the current timer status as a string
-func (m teaTimerModel) getStatus() string {
-	if m.timer.Timedout() {
-		return "completed"
-	}
-	if m.exitState.shouldSave {
-		return "quitting"
-	}
-	if m.timer.Running() {
-		return "running"
-	}
-	return "paused"
-}
-
-// getRemainingTime calculates and clamps the remaining time
-func (m teaTimerModel) getRemainingTime() time.Duration {
-	remaining := m.duration - m.elapsed
-	if remaining < 0 {
-		return 0
-	}
-	return remaining
-}
-
 func (m teaTimerModel) instructions() string {
 	if m.showHelp {
 		lines := []string{
@@ -207,16 +251,32 @@ func (m teaTimerModel) instructions() string {
 	return "Controls: p pause/resume • enter stop-save • q quit-save • ctrl+c abort-plan • h help"
 }
 
-func (m *teaTimerModel) syncElapsed() {
-	remaining := m.timer.Timeout
+// getStatus returns the current timer status as a string
+func (m teaTimerModel) getStatus() string {
+	if m.exitState.shouldSave {
+		return "quitting"
+	}
+	if m.isRunning {
+		return "running"
+	}
+	return "paused"
+}
+
+// getRemainingTime calculates and clamps the remaining time
+func (m teaTimerModel) getRemainingTime() time.Duration {
+	remaining := m.duration - m.elapsed
 	if remaining < 0 {
-		remaining = 0
+		return 0
 	}
-	elapsed := m.duration - remaining
-	if elapsed < 0 {
-		elapsed = 0
+	return remaining
+}
+
+func (m *teaTimerModel) updateElapsed() {
+	if m.isRunning && !m.startTime.IsZero() {
+		m.elapsed = m.accumulated + time.Since(m.startTime)
+	} else {
+		m.elapsed = m.accumulated
 	}
-	m.elapsed = elapsed
 }
 
 func formatDuration(d time.Duration) string {
@@ -226,7 +286,13 @@ func formatDuration(d time.Duration) string {
 }
 
 func (t *TaskTimer) Run() error {
-	model := newTeaTimerModel(t)
+	// Call server to start the running task
+	runningTask, err := api.StartRunningTask(t.Name, t.Role, t.TimeDuration, t.SourceDay)
+	if err != nil {
+		return fmt.Errorf("failed to start task on server: %w", err)
+	}
+
+	model := newTeaTimerModel(t, runningTask)
 
 	// Create program with signal catching disabled so Bubble Tea handles ctrl+c naturally
 	program := tea.NewProgram(model, tea.WithoutSignalHandler())
@@ -275,11 +341,10 @@ func (t *TaskTimer) Run() error {
 	return nil
 }
 
-func (t *TaskTimer) beginSession() {
+func (t *TaskTimer) beginSession(startTime time.Time) {
 	if t.TimeBegin.IsZero() {
-		t.TimeBegin = time.Now()
-		t.MsgID = telegram.TelegramStartSend(t.Name)
-		slog.Info("timer started", "task", t.Name, "duration_minutes", t.TimeDuration)
+		t.TimeBegin = startTime
+		slog.Info("timer started on server", "task", t.Name, "duration_minutes", t.TimeDuration)
 	}
 }
 
@@ -301,7 +366,6 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 	t.TimeDone = elapsed.Minutes()
 
 	if completed {
-		timer.TimeDurationDel(t.TimeDuration)
 		notifyMessage := ""
 		if message, err := procent.ChangeGroupPlanPercent(); err != nil {
 			slog.Error("failed to notify percent change", "error", err)
@@ -333,14 +397,7 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 		}
 	}
 
-	minutesLogged := int(t.TimeDone)
-	if minutesLogged > 0 {
-		api.AddTaskRecord(t.Name, minutesLogged, t.SourceDay)
-	}
-
 	statistic.StatisticTaskShow(t.Name)
 	statistic.StatisticFullShow()
 	rest.RestShow()
-
-	telegram.TelegramStopSend(t.Name, t.MsgID, minutesLogged, t.TimeEnd.Format(timeFormat))
 }

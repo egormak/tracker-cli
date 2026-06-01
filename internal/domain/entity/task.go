@@ -39,3 +39,23 @@ type TaskList struct {
 	TimeDone     int    `json:"time_done"`
 	Priority     int    `json:"priority"`
 }
+
+type RunningTask struct {
+	ID                string    `json:"id"`
+	TaskName          string    `json:"task_name"`
+	Role              string    `json:"role"`
+	StartTime         time.Time `json:"start_time"`
+	Accumulated       int       `json:"accumulated"` // accumulated minutes
+	IsRunning         bool      `json:"is_running"`
+	TargetDuration    int       `json:"target_duration"`
+	SourceDay         string    `json:"source_day"`
+	TelegramMessageID int       `json:"telegram_message_id"`
+}
+
+type TaskRecord struct {
+	Name         string `json:"name"`
+	Role         string `json:"role"`
+	TimeDuration int    `json:"time_duration"`
+	Date         string `json:"date"`
+	SourceDay    string `json:"source_day"`
+}
