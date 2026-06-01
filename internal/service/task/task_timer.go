@@ -150,6 +150,9 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case smoothTickMsg:
 		m.updateElapsed()
+		if m.duration > 0 && m.elapsed >= m.duration {
+			return m, stopTaskCmd(false)
+		}
 		return m, smoothTickCmd()
 
 	case statusPollMsg:
@@ -166,6 +169,9 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.accumulated = time.Duration(msg.task.Accumulated) * time.Minute
 		m.startTime = msg.task.StartTime
 		m.updateElapsed()
+		if m.duration > 0 && m.elapsed >= m.duration {
+			return m, stopTaskCmd(false)
+		}
 		return m, pollStatusCmd()
 
 	case togglePauseResultMsg:
