@@ -119,7 +119,7 @@ func runBacklogOnce(ctx context.Context, delay time.Duration, restLimitActive bo
 		}
 		return fmt.Errorf("initialise task timer: %w", err)
 	}
-	
+
 	timerObj.SourceDay = rollover.SourceDay
 	timerObj.SetRestLimitActive(restLimitActive)
 

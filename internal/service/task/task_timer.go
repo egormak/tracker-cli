@@ -68,6 +68,7 @@ type teaTimerModel struct {
 	task        *TaskTimer
 	exitState   exitState
 	showHelp    bool
+	stopping    bool
 }
 
 type statusPollMsg struct {
@@ -96,9 +97,9 @@ type exitState struct {
 
 type interruptMsg struct{}
 
-func pollStatusCmd() tea.Cmd {
+func pollStatusCmd(taskName string) tea.Cmd {
 	return tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg {
-		status, err := api.GetRunningTaskStatus()
+		status, err := api.GetRunningTaskStatus(taskName)
 		return statusPollMsg{task: status, err: err}
 	})
 }
@@ -109,22 +110,22 @@ func smoothTickCmd() tea.Cmd {
 	})
 }
 
-func togglePauseCmd(currentlyRunning bool) tea.Cmd {
+func togglePauseCmd(taskName string, currentlyRunning bool) tea.Cmd {
 	return func() tea.Msg {
 		var task entity.RunningTask
 		var err error
 		if currentlyRunning {
-			task, err = api.PauseRunningTask()
+			task, err = api.PauseRunningTask(taskName)
 		} else {
-			task, err = api.ResumeRunningTask()
+			task, err = api.ResumeRunningTask(taskName)
 		}
 		return togglePauseResultMsg{task: task, err: err}
 	}
 }
 
-func stopTaskCmd(abortPlan bool) tea.Cmd {
+func stopTaskCmd(taskName string, abortPlan bool) tea.Cmd {
 	return func() tea.Msg {
-		record, err := api.StopRunningTask()
+		record, err := api.StopRunningTask(taskName)
 		return stopTaskResultMsg{record: record, abortPlan: abortPlan, err: err}
 	}
 }
@@ -138,20 +139,25 @@ func newTeaTimerModel(task *TaskTimer, runningTask entity.RunningTask) teaTimerM
 		isRunning:   runningTask.IsRunning,
 		accumulated: time.Duration(runningTask.Accumulated) * time.Minute,
 		startTime:   runningTask.StartTime,
+		stopping:    false,
 	}
 }
 
 func (m teaTimerModel) Init() tea.Cmd {
 	m.task.beginSession(m.startTime)
-	return tea.Batch(pollStatusCmd(), smoothTickCmd())
+	return tea.Batch(pollStatusCmd(m.task.Name), smoothTickCmd())
 }
 
 func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case smoothTickMsg:
+		if m.stopping {
+			return m, nil
+		}
 		m.updateElapsed()
 		if m.duration > 0 && m.elapsed >= m.duration {
-			return m, stopTaskCmd(false)
+			m.stopping = true
+			return m, stopTaskCmd(m.task.Name, false)
 		}
 		return m, smoothTickCmd()
 
@@ -159,6 +165,9 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			slog.Error("Failed to fetch running task status from server", "error", msg.err)
 			return m, tea.Quit
+		}
+		if m.stopping {
+			return m, nil
 		}
 		if msg.task.TaskName == "" || msg.task.TaskName != m.task.Name {
 			// Task was stopped or completed from another service!
@@ -170,9 +179,10 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.startTime = msg.task.StartTime
 		m.updateElapsed()
 		if m.duration > 0 && m.elapsed >= m.duration {
-			return m, stopTaskCmd(false)
+			m.stopping = true
+			return m, stopTaskCmd(m.task.Name, false)
 		}
-		return m, pollStatusCmd()
+		return m, pollStatusCmd(m.task.Name)
 
 	case togglePauseResultMsg:
 		if msg.err != nil {
@@ -196,21 +206,31 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case interruptMsg:
-		return m, stopTaskCmd(true)
+		if m.stopping {
+			return m, nil
+		}
+		m.stopping = true
+		return m, stopTaskCmd(m.task.Name, true)
 
 	case tea.KeyMsg:
+		if m.stopping {
+			return m, nil
+		}
 		switch {
 		case key.Matches(msg, m.keymap.quit):
-			return m, stopTaskCmd(false)
+			m.stopping = true
+			return m, stopTaskCmd(m.task.Name, false)
 		case key.Matches(msg, m.keymap.abort):
-			return m, stopTaskCmd(true)
+			m.stopping = true
+			return m, stopTaskCmd(m.task.Name, true)
 		case key.Matches(msg, m.keymap.pause):
-			return m, togglePauseCmd(m.isRunning)
+			return m, togglePauseCmd(m.task.Name, m.isRunning)
 		case key.Matches(msg, m.keymap.stop):
 			if !m.task.started() {
 				return m, nil
 			}
-			return m, stopTaskCmd(false)
+			m.stopping = true
+			return m, stopTaskCmd(m.task.Name, false)
 		case key.Matches(msg, m.keymap.help):
 			m.showHelp = !m.showHelp
 			return m, nil

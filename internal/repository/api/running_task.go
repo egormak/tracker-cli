@@ -49,8 +49,12 @@ func StartRunningTask(name, role string, targetDuration int, sourceDay string) (
 	return resp.Data, nil
 }
 
-func GetRunningTaskStatus() (entity.RunningTask, error) {
-	responseBody, err := sendRequest("GET", "/api/v1/timer/run/status", nil)
+func GetRunningTaskStatus(taskName string) (entity.RunningTask, error) {
+	url := "/api/v1/timer/run/status"
+	if taskName != "" {
+		url = fmt.Sprintf("%s?task_name=%s", url, taskName)
+	}
+	responseBody, err := sendRequest("GET", url, nil)
 	if err != nil {
 		return entity.RunningTask{}, fmt.Errorf("get running task status: %w", err)
 	}
@@ -64,8 +68,15 @@ func GetRunningTaskStatus() (entity.RunningTask, error) {
 	return resp.Data, nil
 }
 
-func PauseRunningTask() (entity.RunningTask, error) {
-	responseBody, err := sendRequest("POST", "/api/v1/timer/run/pause", nil)
+func PauseRunningTask(taskName string) (entity.RunningTask, error) {
+	var body bytes.Buffer
+	if taskName != "" {
+		payload := struct {
+			TaskName string `json:"task_name"`
+		}{TaskName: taskName}
+		_ = json.NewEncoder(&body).Encode(payload)
+	}
+	responseBody, err := sendRequest("POST", "/api/v1/timer/run/pause", &body)
 	if err != nil {
 		return entity.RunningTask{}, fmt.Errorf("pause running task: %w", err)
 	}
@@ -79,8 +90,15 @@ func PauseRunningTask() (entity.RunningTask, error) {
 	return resp.Data, nil
 }
 
-func ResumeRunningTask() (entity.RunningTask, error) {
-	responseBody, err := sendRequest("POST", "/api/v1/timer/run/resume", nil)
+func ResumeRunningTask(taskName string) (entity.RunningTask, error) {
+	var body bytes.Buffer
+	if taskName != "" {
+		payload := struct {
+			TaskName string `json:"task_name"`
+		}{TaskName: taskName}
+		_ = json.NewEncoder(&body).Encode(payload)
+	}
+	responseBody, err := sendRequest("POST", "/api/v1/timer/run/resume", &body)
 	if err != nil {
 		return entity.RunningTask{}, fmt.Errorf("resume running task: %w", err)
 	}
@@ -94,8 +112,15 @@ func ResumeRunningTask() (entity.RunningTask, error) {
 	return resp.Data, nil
 }
 
-func StopRunningTask() (entity.TaskRecord, error) {
-	responseBody, err := sendRequest("POST", "/api/v1/timer/run/stop", nil)
+func StopRunningTask(taskName string) (entity.TaskRecord, error) {
+	var body bytes.Buffer
+	if taskName != "" {
+		payload := struct {
+			TaskName string `json:"task_name"`
+		}{TaskName: taskName}
+		_ = json.NewEncoder(&body).Encode(payload)
+	}
+	responseBody, err := sendRequest("POST", "/api/v1/timer/run/stop", &body)
 	if err != nil {
 		return entity.TaskRecord{}, fmt.Errorf("stop running task: %w", err)
 	}
