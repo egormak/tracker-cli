@@ -42,12 +42,14 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read previous-days flag: %w", err)
 	}
 
+	percentSpecified := cmd.Flags().Changed("percent")
+
 	// If previous-days flag is set, use schedule-aware task retrieval
 	if previousDays {
-		return runTaskWithSchedule(taskName, taskTime, taskPercent, sourceDay)
+		return runTaskWithSchedule(taskName, taskTime, taskPercent, sourceDay, percentSpecified)
 	}
 
-	taskApp, err := CreateTaskTimer(taskName, taskTime, taskPercent)
+	taskApp, err := CreateTaskTimerWithPercentFlag(taskName, taskTime, taskPercent, percentSpecified)
 	if err != nil {
 		if errors.Is(err, ErrTaskCompleted) {
 			cmd.Printf("task %s has no remaining time for the selected percent\n", taskName)
@@ -72,12 +74,20 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// CreateTaskTimer initializes a new TaskTimer object with the provided parameters
+// CreateTaskTimer initializes a new TaskTimer object with the provided parameters.
+// Callers here pass a real, authoritative percent (not a CLI flag that may have been
+// omitted), so the schedule cap and completion check are always enforced.
 func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, error) {
+	return CreateTaskTimerWithPercentFlag(name, requestedDuration, percent, true)
+}
+
+// CreateTaskTimerWithPercentFlag initializes a TaskTimer object indicating whether the percent flag was explicitly specified
+func CreateTaskTimerWithPercentFlag(name string, requestedDuration, percent int, percentSpecified bool) (*TaskTimer, error) {
 	taskParams := api.GetTaskParams(name)
 	taskDone := api.StatisticTaskGet(name)
+	apiDuration := api.TimeDurationGet()
 
-	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone)
+	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone, apiDuration, percentSpecified)
 	if err != nil {
 		return nil, fmt.Errorf("calculate duration: %w", err)
 	}
@@ -91,30 +101,42 @@ func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, e
 	}, nil
 }
 
-// calculateDuration determines the appropriate time duration for any task based on schedule, percent, and time done
-func calculateDuration(params entity.TaskParams, requested, percent, done int) (int, error) {
+// calculateDuration determines the appropriate time duration for any task based on schedule, percent, time done, and explicit flags
+func calculateDuration(params entity.TaskParams, requested, percent, done, apiDuration int, percentSpecified bool) (int, error) {
 	if params == (entity.TaskParams{}) || params.Time == 0 {
 		if requested > 0 {
 			return requested, nil
 		}
-		return api.TimeDurationGet(), nil
+		return apiDuration, nil
 	}
-
-	fmt.Println("Time Duration: ", params.Time)
 
 	timeLeft := calculateTimeLeft(params.Time, percent, done)
-	if timeLeft <= 0 {
-		return 0, ErrTaskCompleted
-	}
 
-	if requested > 0 {
-		if requested <= timeLeft {
+	if percentSpecified {
+		if timeLeft <= 0 {
+			return 0, ErrTaskCompleted
+		}
+		if requested > 0 {
+			if timeLeft < requested {
+				return timeLeft, nil
+			}
 			return requested, nil
+		}
+		if apiDuration <= timeLeft {
+			return apiDuration, nil
 		}
 		return timeLeft, nil
 	}
 
-	apiDuration := api.TimeDurationGet()
+	// When percent was NOT explicitly specified (e.g. tracker task -n video -t 25):
+	if requested > 0 {
+		return requested, nil
+	}
+
+	if timeLeft <= 0 {
+		return 0, ErrTaskCompleted
+	}
+
 	if apiDuration <= timeLeft {
 		return apiDuration, nil
 	}
@@ -127,7 +149,7 @@ func calculateTimeLeft(planDuration, percent, done int) int {
 }
 
 // runTaskWithSchedule runs a task using schedule-aware lookup to find tasks from previous days
-func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, explicitSourceDay string) error {
+func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, explicitSourceDay string, percentSpecified bool) error {
 	// Get task info with schedule awareness (searches Monday to today)
 	percent, timeLeft, sourceDay, err := api.GetTaskByNameSchedule(taskName)
 	if err != nil {
@@ -136,7 +158,7 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 
 	// Use schedule-provided values or fall back to explicit flags
 	finalPercent := percent
-	if requestedPercent != 100 {
+	if percentSpecified {
 		// If user explicitly set percent, use that instead
 		finalPercent = requestedPercent
 	}
@@ -184,7 +206,7 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 	}
 
 	// Create task timer
-	taskApp, err := CreateTaskTimer(taskName, duration, finalPercent)
+	taskApp, err := CreateTaskTimerWithPercentFlag(taskName, duration, finalPercent, percentSpecified)
 	if err != nil {
 		if errors.Is(err, ErrTaskCompleted) {
 			slog.Info("task already completed for selected percent", "task", taskName)

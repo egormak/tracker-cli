@@ -36,7 +36,9 @@ var menuCmd = &cobra.Command{
 			return fmt.Errorf("percent must be greater than zero")
 		}
 
-		taskTimer, err := task.CreateTaskTimer(selectedTask, timeMinutes, percent)
+		percentSpecified := cmd.Flags().Changed("percent")
+
+		taskTimer, err := task.CreateTaskTimerWithPercentFlag(selectedTask, timeMinutes, percent, percentSpecified)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
 				cmd.Printf("Task %s has no remaining time.\n", selectedTask)

@@ -17,7 +17,7 @@ sudo mv tracker /usr/local/bin/tracker   # optional, to install globally
 go run ./cmd/app/main.go [command]       # quick dev run
 ```
 
-There is no test suite in this repo (no `*_test.go` files) — use `go build ./...` / `go vet ./...` to check correctness.
+Test coverage is minimal — currently only `internal/service/task/task_test.go` (table-driven tests for `calculateDuration`/`calculateTimeLeft`). Run `go test ./...` (or `go test ./internal/service/task/...` for just that package); use `go build ./...` / `go vet ./...` for everything else.
 
 Pushing a git tag triggers `.github/workflows/github-actions-demo.yml`, which builds the binary and publishes it as a GitHub release artifact.
 
@@ -33,7 +33,7 @@ docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db
 ## Architecture
 
 - **`cmd/command/`** — one file per Cobra command. Each file defines a `*cobra.Command` and registers itself onto `rootCmd` from an `init()` function, so adding a command means creating a new file here (following an existing one) rather than editing a central registry.
-- **`internal/service/<feature>/`** — business logic per feature (task, task_params, menu, statistic, procent, rest, telegram, timer, role, plan, manager). Bubble Tea models live alongside their feature's service code (e.g. `internal/service/task/task_timer.go`, `internal/service/menu/menu.go`).
+- **`internal/service/<feature>/`** — business logic per feature (task, task_params, menu, statistic, procent, rest, telegram, timer, role, plan, manager, evening). Bubble Tea models live alongside their feature's service code (e.g. `internal/service/task/task_timer.go`, `internal/service/menu/menu.go`, `internal/service/evening/evening.go`).
 - **`internal/repository/api/`** — the intended REST client layer, built around a single `sendRequest(method, path, body)` helper in `api.go` (15s timeout, JSON headers, base URL from `config.TrackerDomain`).
 - **`internal/domain/entity/`** — DTOs shared between the API layer and services (`task.go`, `role.go`, `statistic.go`, `timers.go`, `schedule.go`, `general.go`).
 
@@ -69,6 +69,7 @@ The backend stores/returns rest time as integer "units" equal to `minutes * 100`
 
 - `tracker menu` — interactive task picker (Bubble Tea table), then starts the selected task's timer
 - `tracker task -n NAME [-t minutes] [-p percent] [-s source-day] [--previous-days]` — run a task timer; `--previous-days` looks up the task via the schedule-aware endpoint across Monday-to-today
+- `tracker evening [-c category] [-t sprint-minutes] [-s skip-task]` — Bubble Tea "Evening Catch-Up" picker (`internal/service/evening`) that surfaces the biggest weekly-gap task via `GetEveningFocus`/`SkipEveningTask`, then runs it through the normal `task.CreateTaskTimer(...).Run()` flow at 100%
 - `tracker taskadd -n NAME -r ROLE` — add/register a task under a role
 - `tracker tasklist` — render the task list as a table
 - `tracker statistic` — print today/yesterday/all-time completion stats and role totals

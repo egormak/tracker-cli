@@ -1,11 +1,11 @@
 package entity
 
 type EveningFocusCandidate struct {
-	TaskName   string `json:"task_name"`
-	Role       string `json:"role"`
-	WeeklyGap  int    `json:"weekly_gap"`
-	Priority   int    `json:"priority"`
-	IsStrict   bool   `json:"is_strict"`
+	TaskName  string `json:"task_name"`
+	Role      string `json:"role"`
+	WeeklyGap int    `json:"weekly_gap"`
+	Priority  int    `json:"priority"`
+	IsStrict  bool   `json:"is_strict"`
 }
 
 type EveningFocusResponse struct {

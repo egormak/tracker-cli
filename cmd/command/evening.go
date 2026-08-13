@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -32,11 +33,15 @@ var eveningCmd = &cobra.Command{
 
 		taskTimer, err := task.CreateTaskTimer(selectedTask, duration, 100)
 		if err != nil {
+			if errors.Is(err, task.ErrTaskCompleted) {
+				cmd.Printf("Task %s has no remaining time.\n", selectedTask)
+				return nil
+			}
 			return err
 		}
 
 		if err := taskTimer.Run(); err != nil {
-			if err.Error() == "task aborted" {
+			if errors.Is(err, task.ErrTaskAborted) {
 				return nil
 			}
 			return err
