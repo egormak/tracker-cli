@@ -172,11 +172,14 @@ test/
   - `TaskParams`: Task planning parameters (name, time, priority)
   - `TaskList`: Task list view with statistics
   - `TaskRecorcRequest`: Recording task completion
-- **Duration Calculation**: 
-  - Support default duration from API or explicit duration flag
-  - Calculate time left based on plan duration, percentage, and time done
-  - Return `ErrTaskCompleted` when no time remains
-  - Prefer time left over requested duration when less time remains
+- **Duration Calculation (Universal Rule)**: 
+  - **No Hardcoded Task Names**: All duration calculations MUST be 100% universal across all tasks. Never hardcode specific task names (e.g. `"work"`, `"english"`) in calculation logic.
+  - **Percent Stage Target**: Calculate `timeLeft = (params.Time * percent) / 100 - done`.
+  - **Completion Check**: If `timeLeft <= 0`, return `ErrTaskCompleted` (no time remaining for the selected percent stage).
+  - **Duration Capping**: Always cap session length to remaining time:
+    - If explicit `-t <requested>` is provided: duration = `min(requested, timeLeft)`.
+    - If `-t` is omitted: duration = `min(apiDefaultDuration, timeLeft)`.
+  - **Never Bypass Percent Bounds**: An explicit requested duration `-t` MUST NOT bypass or ignore the percentage target `-p` bounds or `timeLeft` calculations.
 - **Task Execution Flow**:
   1. Get task parameters from API
   2. Get time already spent on task

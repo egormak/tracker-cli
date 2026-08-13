@@ -94,7 +94,7 @@ func GetTaskParams(taskName string) TaskParams {
 	var taskRole TaskParams
 	err = json.NewDecoder(resp.Body).Decode(&taskRole)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 	}
 
 	return taskRole

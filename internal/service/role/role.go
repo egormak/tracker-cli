@@ -68,7 +68,7 @@ func TaskRoleGet(taskName string) string {
 	var taskRole map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&taskRole)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 	}
 
 	return taskRole["role"]

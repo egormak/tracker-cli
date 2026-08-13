@@ -43,7 +43,7 @@ func ShowTaskNameList() {
 	var taskList []entity.TaskList
 	err = json.NewDecoder(resp.Body).Decode(&taskList)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 		os.Exit(1)
 	}
 

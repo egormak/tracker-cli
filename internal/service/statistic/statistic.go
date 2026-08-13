@@ -59,7 +59,7 @@ func StatisticTaskGet(taskName string) int {
 
 	err = json.NewDecoder(resp.Body).Decode(&taskResult)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 	}
 
 	return taskResult.TaskTime
@@ -112,7 +112,7 @@ func getScheduledTimeToday() int {
 	var timerGlobal map[string]int
 	err = json.NewDecoder(resp.Body).Decode(&timerGlobal)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 	}
 
 	return timerGlobal["timer_global"]
@@ -143,7 +143,7 @@ func statCompletionTimeDone() int {
 	var timerDone map[string]int
 	err = json.NewDecoder(resp.Body).Decode(&timerDone)
 	if err != nil {
-		slog.Error("failed to decode response: %w", err)
+		slog.Error("failed to decode response", "error", err)
 	}
 
 	return timerDone["time_done"]
