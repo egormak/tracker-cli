@@ -31,7 +31,10 @@ var eveningCmd = &cobra.Command{
 
 		cmd.Printf("🚀 Starting Evening Focus Sprint on '%s' (%d min)...\n", selectedTask, duration)
 
-		taskTimer, err := task.CreateTaskTimer(selectedTask, duration, 100)
+		// Evening sprint duration is derived from weekly deficit, not today's daily
+		// target, so percentSpecified=false bypasses the daily-target timeLeft cap
+		// (flexible/background tasks have tiny daily targets often already spent today).
+		taskTimer, err := task.CreateTaskTimerWithPercentFlag(selectedTask, duration, 100, false)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
 				cmd.Printf("Task %s has no remaining time.\n", selectedTask)

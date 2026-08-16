@@ -143,13 +143,31 @@ func newTeaTimerModel(task *TaskTimer, runningTask entity.RunningTask) teaTimerM
 	}
 }
 
+type heartbeatTickMsg struct{}
+
+func heartbeatCmd(taskName string) tea.Cmd {
+	return tea.Tick(20*time.Second, func(t time.Time) tea.Msg {
+		_, _ = api.SendHeartbeat(taskName)
+		return heartbeatTickMsg{}
+	})
+}
+
 func (m teaTimerModel) Init() tea.Cmd {
 	m.task.beginSession(m.startTime)
-	return tea.Batch(pollStatusCmd(m.task.Name), smoothTickCmd())
+	return tea.Batch(pollStatusCmd(m.task.Name), smoothTickCmd(), heartbeatCmd(m.task.Name))
 }
 
 func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case heartbeatTickMsg:
+		if m.stopping {
+			return m, nil
+		}
+		if m.isRunning {
+			return m, heartbeatCmd(m.task.Name)
+		}
+		return m, nil
+
 	case smoothTickMsg:
 		if m.stopping {
 			return m, nil

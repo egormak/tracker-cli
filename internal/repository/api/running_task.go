@@ -133,3 +133,27 @@ func StopRunningTask(taskName string) (entity.TaskRecord, error) {
 
 	return resp.Data, nil
 }
+
+func SendHeartbeat(taskName string) (entity.RunningTask, error) {
+	var body bytes.Buffer
+	if taskName != "" {
+		payload := struct {
+			TaskName string `json:"task_name"`
+		}{TaskName: taskName}
+		_ = json.NewEncoder(&body).Encode(payload)
+	}
+	responseBody, err := sendRequest("POST", "/api/v1/timer/run/heartbeat", &body)
+	if err != nil {
+		return entity.RunningTask{}, fmt.Errorf("send heartbeat: %w", err)
+	}
+	defer responseBody.Close()
+
+	var resp runningTaskResponse
+	if err := json.NewDecoder(responseBody).Decode(&resp); err != nil {
+		return entity.RunningTask{}, fmt.Errorf("decode heartbeat response: %w", err)
+	}
+
+	return resp.Data, nil
+}
+
+
