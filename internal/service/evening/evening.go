@@ -107,11 +107,12 @@ func (m model) View() string {
 	} else {
 		taskInfo := fmt.Sprintf(
 			"🎯 Рекомендуемая задача:  %s\n"+
-				"📉 Недельное отставание: -%d мин\n"+
+				"📊 Сделано за неделю:     %d мин (план: %d мин)\n"+
 				"⏱️ Целевой спринт:       %d мин (Отдых: %d мин)\n"+
 				"📋 Кандидаты в очереди: %d",
 			taskStyle.Render(m.focus.CurrentTask.TaskName),
-			m.focus.CurrentTask.WeeklyGap,
+			m.focus.CurrentTask.WeeklyDone,
+			m.focus.CurrentTask.WeeklyTarget,
 			m.sprintTime,
 			m.focus.RestPool,
 			len(m.focus.Candidates),
