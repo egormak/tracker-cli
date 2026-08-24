@@ -30,6 +30,8 @@ type timerKeymap struct {
 	stop  key.Binding
 	quit  key.Binding
 	abort key.Binding
+	add5  key.Binding
+	sub5  key.Binding
 	help  key.Binding
 }
 
@@ -50,6 +52,14 @@ func newTimerKeymap() timerKeymap {
 		abort: key.NewBinding(
 			key.WithKeys("ctrl+c"),
 			key.WithHelp("ctrl+c", "quit & save, abort plan"),
+		),
+		add5: key.NewBinding(
+			key.WithKeys("+", "=", "]"),
+			key.WithHelp("+", "+5 min"),
+		),
+		sub5: key.NewBinding(
+			key.WithKeys("-", "_", "["),
+			key.WithHelp("-", "-5 min"),
 		),
 		help: key.NewBinding(
 			key.WithKeys("h"),
@@ -87,6 +97,18 @@ type stopTaskResultMsg struct {
 	record    entity.TaskRecord
 	abortPlan bool
 	err       error
+}
+
+type adjustResultMsg struct {
+	task entity.RunningTask
+	err  error
+}
+
+func adjustTaskCmd(taskName string, delta int) tea.Cmd {
+	return func() tea.Msg {
+		task, err := api.AdjustRunningTask(taskName, delta)
+		return adjustResultMsg{task: task, err: err}
+	}
 }
 
 type exitState struct {
@@ -223,6 +245,15 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.exitState = exitState{shouldSave: true, completed: m.elapsed >= m.duration, abortPlan: msg.abortPlan}
 		return m, tea.Quit
 
+	case adjustResultMsg:
+		if msg.err != nil {
+			slog.Error("Failed to adjust running task on server", "error", msg.err)
+			return m, nil
+		}
+		m.duration = time.Duration(msg.task.TargetDuration) * time.Minute
+		m.task.TimeDuration = msg.task.TargetDuration
+		return m, nil
+
 	case interruptMsg:
 		if m.stopping {
 			return m, nil
@@ -243,6 +274,10 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, stopTaskCmd(m.task.Name, true)
 		case key.Matches(msg, m.keymap.pause):
 			return m, togglePauseCmd(m.task.Name, m.isRunning)
+		case key.Matches(msg, m.keymap.add5):
+			return m, adjustTaskCmd(m.task.Name, 5)
+		case key.Matches(msg, m.keymap.sub5):
+			return m, adjustTaskCmd(m.task.Name, -5)
 		case key.Matches(msg, m.keymap.stop):
 			if !m.task.started() {
 				return m, nil
@@ -284,6 +319,7 @@ func (m teaTimerModel) instructions() string {
 		lines := []string{
 			"Controls:",
 			fmt.Sprintf("  %-10s %s", "p", "pause or resume timer"),
+			fmt.Sprintf("  %-10s %s", "+ / -", "adjust target duration +/- 5 min"),
 			fmt.Sprintf("  %-10s %s", "enter", "stop timer and save result"),
 			fmt.Sprintf("  %-10s %s", "q", "quit and save progress"),
 			fmt.Sprintf("  %-10s %s", "ctrl+c", "quit, save, and abort plan"),
@@ -292,7 +328,7 @@ func (m teaTimerModel) instructions() string {
 		return strings.Join(lines, "\n")
 	}
 
-	return "Controls: p pause/resume • enter stop-save • q quit-save • ctrl+c abort-plan • h help"
+	return "Controls: p pause/resume • +/- adjust 5m • enter stop-save • q quit-save • ctrl+c abort-plan • h help"
 }
 
 // getStatus returns the current timer status as a string

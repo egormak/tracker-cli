@@ -11,7 +11,7 @@ type restTimeResponse struct {
 
 // GetRestTime returns the current rest balance in raw API units.
 func GetRestTime() (int, error) {
-	body, err := sendRequest("GET", "/api/v1/rest-get", nil)
+	body, err := sendRequest("GET", "/api/v1/rest/get", nil)
 	if err != nil {
 		return 0, fmt.Errorf("request rest time: %w", err)
 	}

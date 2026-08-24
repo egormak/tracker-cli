@@ -9,7 +9,7 @@ import (
 func GetTaskByPercentPlan() (string, int, error) {
 	var result entity.TaskPercent
 
-	responseBody, err := sendRequest("GET", "/api/v1/task/plan-percent", nil)
+	responseBody, err := sendRequest("GET", "/api/v1/task/plan/percent", nil)
 	if err != nil {
 		return "", 0, fmt.Errorf("request percent plan: %w", err)
 	}

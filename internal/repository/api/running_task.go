@@ -156,4 +156,29 @@ func SendHeartbeat(taskName string) (entity.RunningTask, error) {
 	return resp.Data, nil
 }
 
+func AdjustRunningTask(taskName string, deltaMinutes int) (entity.RunningTask, error) {
+	var body bytes.Buffer
+	payload := struct {
+		TaskName     string `json:"task_name"`
+		DeltaMinutes int    `json:"delta_minutes"`
+	}{
+		TaskName:     taskName,
+		DeltaMinutes: deltaMinutes,
+	}
+	_ = json.NewEncoder(&body).Encode(payload)
+
+	responseBody, err := sendRequest("POST", "/api/v1/timer/run/adjust", &body)
+	if err != nil {
+		return entity.RunningTask{}, fmt.Errorf("adjust running task: %w", err)
+	}
+	defer responseBody.Close()
+
+	var resp runningTaskResponse
+	if err := json.NewDecoder(responseBody).Decode(&resp); err != nil {
+		return entity.RunningTask{}, fmt.Errorf("decode adjust response: %w", err)
+	}
+
+	return resp.Data, nil
+}
+
 

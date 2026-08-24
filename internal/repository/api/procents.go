@@ -38,7 +38,7 @@ func UpdateRoleProcents(role string, percents []int) error {
 
 // TriggerPlanPercentChange requests a refresh of the percent plan on the backend.
 func TriggerPlanPercentChange() (string, error) {
-	respBody, err := sendRequest("GET", "/api/v1/task/plan-percent/change", nil)
+	respBody, err := sendRequest("POST", "/api/v1/task/plan/rotate", nil)
 	if err != nil {
 		return "", fmt.Errorf("trigger plan percent change: %w", err)
 	}

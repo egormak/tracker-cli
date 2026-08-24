@@ -11,7 +11,7 @@ func CleanData() (entity.Answer, error) {
 
 	var result entity.Answer
 
-	responceBody, err := sendRequest(http.MethodGet, "/api/v1/records/clean", nil)
+	responceBody, err := sendRequest(http.MethodPost, "/api/v1/records/clean", nil)
 
 	if err != nil {
 		return result, fmt.Errorf("api-clean-data error: %w", err)
