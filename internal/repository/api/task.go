@@ -81,3 +81,18 @@ func GetTaskRecords() map[string]map[string]int {
 	return result
 
 }
+
+func GetTaskList() ([]entity.TaskList, error) {
+	var taskList []entity.TaskList
+	responseBody, err := sendRequest("GET", "/api/v1/tasklist", nil)
+	if err != nil {
+		return nil, fmt.Errorf("get task list: %w", err)
+	}
+	defer responseBody.Close()
+
+	if err := json.NewDecoder(responseBody).Decode(&taskList); err != nil {
+		return nil, fmt.Errorf("decode task list response: %w", err)
+	}
+	return taskList, nil
+}
+

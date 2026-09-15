@@ -1,15 +1,11 @@
 package menu
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"sort"
 	"strconv"
-	"time"
-	"tracker_cli/config"
+	"tracker_cli/internal/repository/api"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -106,58 +102,30 @@ func RunMenu() string {
 }
 
 func GetRows() []table.Row {
-
-	type taskStat struct {
-		Name     string `json:"name"`
-		Role     string `json:"role"`
-		Priority int    `json:"priority"`
-		Duration int    `json:"time_duration"`
-		Done     int    `json:"time_done"`
-	}
-
 	var rows []table.Row
 
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/tasklist"), nil)
+	tasksInfo, err := api.GetTaskList()
 	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err := client.Do(request)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if resp.StatusCode != 200 {
-		log.Fatal(fmt.Errorf("request error, status code: %d", resp.StatusCode))
-	}
-	defer resp.Body.Close()
-
-	var tasksInfo []taskStat
-	err = json.NewDecoder(resp.Body).Decode(&tasksInfo)
-	if err != nil {
-		log.Fatal(fmt.Errorf("failed to decode response: %w", err))
+		fmt.Printf("Error fetching task list: %v\n", err)
+		return rows
 	}
 
 	sort.Slice(tasksInfo, func(i, j int) bool { return tasksInfo[i].Priority > tasksInfo[j].Priority })
 
 	for _, task := range tasksInfo {
 		percentDone := "0%"
-		if task.Duration > 0 {
-			value := float64(task.Done) / float64(task.Duration) * 100
+		if task.TimeDuration > 0 {
+			value := float64(task.TimeDone) / float64(task.TimeDuration) * 100
 			percentDone = fmt.Sprintf("%.0f%%", value)
 		}
 		rows = append(rows, table.Row{
 			task.Name,
 			task.Role,
 			strconv.Itoa(task.Priority),
-			strconv.Itoa(task.Duration),
-			strconv.Itoa(task.Done),
+			strconv.Itoa(task.TimeDuration),
+			strconv.Itoa(task.TimeDone),
 			percentDone,
-			strconv.Itoa(task.Duration - task.Done),
+			strconv.Itoa(task.TimeDuration - task.TimeDone),
 		})
 	}
 

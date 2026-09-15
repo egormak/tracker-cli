@@ -11,9 +11,12 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"tracker_cli/config"
 	"tracker_cli/internal/domain/entity"
+	"tracker_cli/internal/pkg/notifier"
 	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
+	"tracker_cli/internal/repository/ws"
 	"tracker_cli/internal/service/procent"
 	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/statistic"
@@ -102,6 +105,10 @@ type stopTaskResultMsg struct {
 type adjustResultMsg struct {
 	task entity.RunningTask
 	err  error
+}
+
+type wsEventMsg struct {
+	event ws.Event
 }
 
 func adjustTaskCmd(taskName string, delta int) tea.Cmd {
@@ -217,6 +224,8 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isRunning = msg.task.IsRunning
 		m.accumulated = time.Duration(msg.task.Accumulated) * time.Minute
 		m.startTime = msg.task.StartTime
+		m.duration = time.Duration(msg.task.TargetDuration) * time.Minute
+		m.task.TimeDuration = msg.task.TargetDuration
 		m.updateElapsed()
 		if m.duration > 0 && m.elapsed >= m.duration {
 			m.stopping = true
@@ -232,6 +241,8 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isRunning = msg.task.IsRunning
 		m.accumulated = time.Duration(msg.task.Accumulated) * time.Minute
 		m.startTime = msg.task.StartTime
+		m.duration = time.Duration(msg.task.TargetDuration) * time.Minute
+		m.task.TimeDuration = msg.task.TargetDuration
 		m.updateElapsed()
 		return m, nil
 
@@ -252,6 +263,36 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.duration = time.Duration(msg.task.TargetDuration) * time.Minute
 		m.task.TimeDuration = msg.task.TargetDuration
+		return m, nil
+
+	case wsEventMsg:
+		if m.stopping {
+			return m, nil
+		}
+		switch msg.event.Type {
+		case ws.EventTaskAdjusted:
+			if msg.event.TaskName == m.task.Name || msg.event.TaskName == "" {
+				if msg.event.Duration > 0 {
+					m.duration = time.Duration(msg.event.Duration) * time.Minute
+					m.task.TimeDuration = msg.event.Duration
+				}
+			}
+		case ws.EventTaskPaused:
+			if msg.event.TaskName == m.task.Name || msg.event.TaskName == "" {
+				m.isRunning = false
+				m.updateElapsed()
+			}
+		case ws.EventTaskResumed:
+			if msg.event.TaskName == m.task.Name || msg.event.TaskName == "" {
+				m.isRunning = true
+				m.updateElapsed()
+			}
+		case ws.EventTaskStopped:
+			if msg.event.TaskName == m.task.Name || msg.event.TaskName == "" {
+				m.exitState = exitState{shouldSave: false, completed: true, abortPlan: false}
+				return m, tea.Quit
+			}
+		}
 		return m, nil
 
 	case interruptMsg:
@@ -382,21 +423,31 @@ func (t *TaskTimer) Run() error {
 	signal.Notify(sigCh, os.Interrupt)
 	defer signal.Stop(sigCh)
 
-	// Launch signal forwarder in background
-	stopForwarder := make(chan struct{})
+	// Launch WebSocket client in background
+	wsClient := ws.NewClient(config.TrackerDomain)
+	wsEvents := wsClient.Start()
+	defer wsClient.Close()
+
+	// Launch forwarders in background
+	stopForwarders := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-sigCh:
 				program.Send(interruptMsg{})
-			case <-stopForwarder:
+			case ev, ok := <-wsEvents:
+				if !ok {
+					return
+				}
+				program.Send(wsEventMsg{event: ev})
+			case <-stopForwarders:
 				return
 			}
 		}
 	}()
 
 	result, err := program.Run()
-	close(stopForwarder) // Signal goroutine to exit
+	close(stopForwarders) // Signal background goroutine to exit
 
 	if err != nil {
 		return fmt.Errorf("running timer UI: %w", err)
@@ -475,6 +526,8 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 		if msg := strings.TrimSpace(notifyMessage); msg != "" {
 			telegram.TelegramMessageSend(msg)
 		}
+
+		notifier.NotifyTaskCompleted(t.Name, t.Role, int(t.TimeDone))
 	}
 
 	statistic.StatisticTaskShow(t.Name)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,3 +44,26 @@ func GetRolloverTasks() ([]entity.RolloverTask, error) {
 
 	return response.Data.RolloverTasks, nil
 }
+
+func UpdateScheduleTaskTime(taskName string, minutes int, mode string, day string) error {
+	payload := map[string]interface{}{
+		"task_name": taskName,
+		"minutes":   minutes,
+		"mode":      mode,
+	}
+	if day != "" {
+		payload["day"] = day
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	body, err := sendRequest("PATCH", "/api/v1/schedule/active/task-time", bytes.NewBuffer(data))
+	if err != nil {
+		return fmt.Errorf("update schedule task time: %w", err)
+	}
+	defer body.Close()
+	return nil
+}
+
