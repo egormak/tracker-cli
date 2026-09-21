@@ -263,5 +263,13 @@ func TestViewRendering(t *testing.T) {
 		if !strings.Contains(view, "↑/↓ or j/k: Select task | Enter: Start | s: Skip | c: Launch Combo 3x10m | q: Quit") {
 			t.Errorf("expected view to contain keymap instructions, got:\n%s", view)
 		}
+
+		// Verify keymap updates when sprintTime is 30m
+		m30 := m
+		m30.sprintTime = 30
+		view30 := m30.View()
+		if !strings.Contains(view30, "c: Launch Combo 3x15m") {
+			t.Errorf("expected view30 to contain 'c: Launch Combo 3x15m', got:\n%s", view30)
+		}
 	})
 }

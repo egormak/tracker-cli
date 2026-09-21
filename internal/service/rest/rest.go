@@ -22,7 +22,7 @@ func RestSpend(restTime int) {
 		slog.Error("can't marshal JSON", "error", err)
 	}
 
-	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/rest-spend"), bytes.NewBuffer(json_data))
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/rest/spend"), bytes.NewBuffer(json_data))
 	if err != nil {
 		slog.Error("request error", "error", err)
 	}
@@ -51,7 +51,7 @@ func RestAdd(restTime int) {
 		slog.Error("can't marshal JSON", "error", err)
 	}
 
-	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/rest-add"), bytes.NewBuffer(json_data))
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/rest/add"), bytes.NewBuffer(json_data))
 	if err != nil {
 		slog.Error("request error", "error", err)
 	}

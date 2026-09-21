@@ -81,6 +81,22 @@ func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, e
 	return CreateTaskTimerWithPercentFlag(name, requestedDuration, percent, true)
 }
 
+// CreateTaskTimerWithSourceDay initializes a TaskTimer object with sourceDay awareness.
+// When sourceDay is provided (rollover task), the today's completion check is bypassed,
+// using the duration already determined by the schedule.
+func CreateTaskTimerWithSourceDay(name string, requestedDuration, percent int, sourceDay string) (*TaskTimer, error) {
+	if sourceDay != "" {
+		return &TaskTimer{
+			Name:         name,
+			Role:         api.TaskRoleGet(name),
+			TimeDuration: requestedDuration,
+			Percent:      percent,
+			SourceDay:    sourceDay,
+		}, nil
+	}
+	return CreateTaskTimer(name, requestedDuration, percent)
+}
+
 // CreateTaskTimerWithPercentFlag initializes a TaskTimer object indicating whether the percent flag was explicitly specified
 func CreateTaskTimerWithPercentFlag(name string, requestedDuration, percent int, percentSpecified bool) (*TaskTimer, error) {
 	taskParams := api.GetTaskParams(name)

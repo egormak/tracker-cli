@@ -60,3 +60,8 @@ func TriggerPlanPercentChange() (string, error) {
 
 	return answer.Message, nil
 }
+
+// RotatePlanPercent rotates to the next plan percent group on the backend.
+func RotatePlanPercent() (string, error) {
+	return TriggerPlanPercentChange()
+}

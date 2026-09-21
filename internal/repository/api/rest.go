@@ -24,3 +24,13 @@ func GetRestTime() (int, error) {
 
 	return resp.RestTime, nil
 }
+
+// ResetRest resets the daily rest balance to 0 on the server.
+func ResetRest() error {
+	body, err := sendRequest("POST", "/api/v1/rest/reset", nil)
+	if err != nil {
+		return fmt.Errorf("reset rest: %w", err)
+	}
+	defer body.Close()
+	return nil
+}

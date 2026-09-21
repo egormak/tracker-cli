@@ -41,6 +41,7 @@ func init() {
 
 	planPercentCmd.PersistentFlags().Duration("delay", 15*time.Second, "Delay before starting the task timer")
 	planPercentCmd.PersistentFlags().IntP("rest-limit", "r", -1, "Maximum rest minutes before stopping; negative disables continuous mode")
+	planPercentCmd.PersistentFlags().DurationP("batch", "b", 0, "Batch duration (e.g. 30m, 45m, 1h); runs tasks until batch time is reached")
 
 	planPercentSetCmd := &cobra.Command{
 		Use:   "set",
@@ -85,6 +86,15 @@ func runPlanPercent(cmd *cobra.Command) error {
 		return err
 	}
 
+	batch, err := cmd.Flags().GetDuration("batch")
+	if err != nil {
+		return err
+	}
+
+	if batch > 0 {
+		return plan.RunPercentBatch(delay, restLimit, batch, false)
+	}
+
 	return plan.RunPercent(delay, restLimit)
 }
 
@@ -97,6 +107,15 @@ func runPlanPercentSchedule(cmd *cobra.Command) error {
 	restLimit, err := cmd.Flags().GetInt("rest-limit")
 	if err != nil {
 		return err
+	}
+
+	batch, err := cmd.Flags().GetDuration("batch")
+	if err != nil {
+		return err
+	}
+
+	if batch > 0 {
+		return plan.RunPercentBatch(delay, restLimit, batch, true)
 	}
 
 	return plan.RunPercentSchedule(delay, restLimit)

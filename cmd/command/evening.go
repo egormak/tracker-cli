@@ -22,6 +22,7 @@ var eveningCmd = &cobra.Command{
 		sprintTime, _ := cmd.Flags().GetInt("time")
 		skipTask, _ := cmd.Flags().GetString("skip")
 		comboFlag, _ := cmd.Flags().GetBool("combo")
+		comboTime, _ := cmd.Flags().GetInt("combo-time")
 
 		var selectedTask string
 		var duration int
@@ -57,7 +58,11 @@ var eveningCmd = &cobra.Command{
 			}
 
 			comboDuration := 10
-			if duration > 0 {
+			if comboTime > 0 {
+				comboDuration = comboTime
+			} else if comboFlag && cmd.Flags().Changed("time") {
+				comboDuration = sprintTime
+			} else if duration > 0 {
 				comboDuration = duration / 2
 			}
 			if comboDuration <= 0 {
@@ -124,7 +129,8 @@ func init() {
 	eveningCmd.Flags().StringP("category", "c", "", "Filter tasks by category (e.g., learn, rest)")
 	eveningCmd.Flags().IntP("time", "t", 20, "Sprint duration in minutes (15, 20, 30)")
 	eveningCmd.Flags().StringP("skip", "s", "", "Task name to skip for tonight")
-	eveningCmd.Flags().BoolP("combo", "C", false, "Launch sequential combo chain 3x10m across top-3 candidates")
+	eveningCmd.Flags().BoolP("combo", "C", false, "Launch sequential combo chain across top-3 candidates")
+	eveningCmd.Flags().IntP("combo-time", "d", 0, "Sprint duration for each step in combo chain (e.g. 10, 15, 20)")
 
 	rootCmd.AddCommand(eveningCmd)
 }

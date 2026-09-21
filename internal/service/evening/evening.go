@@ -276,7 +276,14 @@ func (m model) View() string {
 	b.WriteString("\n" + durLine + "\n")
 
 	// Keymap instructions
-	help := helpStyle.Render("↑/↓ or j/k: Select task | Enter: Start | s: Skip | c: Launch Combo 3x10m | q: Quit")
+	comboDur := 10
+	if m.sprintTime > 0 {
+		comboDur = m.sprintTime / 2
+	}
+	if comboDur <= 0 {
+		comboDur = 10
+	}
+	help := helpStyle.Render(fmt.Sprintf("↑/↓ or j/k: Select task | Enter: Start | s: Skip | c: Launch Combo 3x%dm | q: Quit", comboDur))
 	b.WriteString(help + "\n")
 
 	return b.String()
