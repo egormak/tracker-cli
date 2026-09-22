@@ -10,24 +10,22 @@ import (
 )
 
 func GetTaskParams(taskName string) entity.TaskParams {
-
 	var result entity.TaskParams
 
 	responceBody, err := sendRequest("GET", fmt.Sprintf("%s?task_name=%s", "/api/v1/task/params", taskName), nil)
-
 	if err != nil {
-		slog.Error("request error: get task params", "error", err)
-		os.Exit(1)
+		slog.Debug("get task params: task not found or error", "task", taskName, "error", err)
+		return entity.TaskParams{}
 	}
+	defer responceBody.Close()
 
 	err = json.NewDecoder(responceBody).Decode(&result)
 	if err != nil {
-		slog.Error("failed to decode response: %w", "error", err)
-		os.Exit(1)
+		slog.Error("failed to decode task params response", "error", err)
+		return entity.TaskParams{}
 	}
 
 	return result
-
 }
 
 func AddTaskRecord(taskName string, timeDone int, sourceDay string) entity.Answer {

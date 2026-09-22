@@ -6,26 +6,22 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 	"tracker_cli/config"
+	"tracker_cli/internal/domain/entity"
 )
 
-type TaskParams struct {
-	Name     string
-	Time     int
-	Priority int
+type TaskParams = entity.TaskParams
+
+var httpClient = &http.Client{
+	Timeout: 15 * time.Second,
 }
 
 func SetTaskParams(taskName string, timeDur int, priority int) {
-
-	var body struct {
-		Name         string `json:"name"`
-		TimeDuration int    `json:"time_duration"`
-		Priority     int    `json:"priority"`
-	}
-
 	if taskName == "" {
 		slog.Error("Task Name is not Set")
+		return
 	}
 	if timeDur == 0 {
 		slog.Error("Time is not Set")
@@ -34,67 +30,76 @@ func SetTaskParams(taskName string, timeDur int, priority int) {
 		slog.Error("Priority is not Set")
 	}
 
-	body.Name = taskName
-	body.TimeDuration = timeDur
-	body.Priority = priority
-
-	json_data, err := json.Marshal(&body)
-	if err != nil {
-		slog.Error("can't marshal JSON", "error", err)
+	body := entity.TaskParams{
+		Name:     taskName,
+		Time:     timeDur,
+		Priority: priority,
 	}
 
-	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/record/params"), bytes.NewBuffer(json_data))
+	jsonData, err := json.Marshal(&body)
+	if err != nil {
+		slog.Error("can't marshal JSON", "error", err)
+		return
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/task/params"), bytes.NewBuffer(jsonData))
 	if err != nil {
 		slog.Error("request error", "error", err)
+		return
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-	resp, err := client.Do(request)
+
+	resp, err := httpClient.Do(request)
 	if err != nil {
 		slog.Error("request error", "error", err)
+		return
 	}
+	if resp == nil {
+		slog.Error("nil response received")
+		return
+	}
+	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		slog.Error("request error", "status code", resp.StatusCode)
 	}
-
 }
 
 func GetTaskParams(taskName string) TaskParams {
-
-	// Get
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s%s?task_name=%s", config.TrackerDomain, "/api/v1/record/params", taskName), nil)
+	requestURL := fmt.Sprintf("%s%s?task_name=%s", config.TrackerDomain, "/api/v1/task/params", url.QueryEscape(taskName))
+	request, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		slog.Error("error in request", "error", err)
-	}
-	resp, err := client.Do(request)
-	if err != nil {
-		slog.Error("error in request", "error", err)
-	}
-
-	if resp.StatusCode == 404 {
-		slog.Info("Task Params not found", "status code", resp.StatusCode)
 		return TaskParams{}
 	}
 
-	if resp.StatusCode != 200 {
-		slog.Error("request error", "status code", resp.StatusCode)
+	resp, err := httpClient.Do(request)
+	if err != nil {
+		slog.Error("error in request", "error", err)
+		return TaskParams{}
+	}
+	if resp == nil {
+		slog.Error("nil response received")
+		return TaskParams{}
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		slog.Debug("task parameters not found", "task", taskName, "status_code", resp.StatusCode)
+		return TaskParams{}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("request error", "status code", resp.StatusCode)
+		return TaskParams{}
+	}
 
 	var taskRole TaskParams
 	err = json.NewDecoder(resp.Body).Decode(&taskRole)
 	if err != nil {
 		slog.Error("failed to decode response", "error", err)
+		return TaskParams{}
 	}
 
 	return taskRole

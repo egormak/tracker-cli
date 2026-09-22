@@ -9,17 +9,13 @@ import (
 )
 
 func StatisticTaskShow(taskName string) {
-	slog.Info("Begin Show Task")
-
 	taskResult := StatisticTaskGet(taskName)
 	timeSchedule := task_params.GetTaskParams(taskName).Time
 
 	if timeSchedule == 0 {
 		slog.Info("Show Result", "task", taskName, "time_duration", taskResult)
 	} else {
-		slog.Info("####")
 		slog.Info("Show Result", "task", taskName, "time_duration", taskResult, "left", timeSchedule-taskResult)
-		slog.Info("####")
 	}
 }
 
@@ -44,7 +40,6 @@ func StatisticFullShow() {
 	timeLeft := scheduledTimeToday - completionTimeDone
 	timePrediction := time.Now().Add(time.Minute * time.Duration(timeLeft))
 
-	slog.Info("####")
 	slog.Info("Percent Done", "percent", completionPercentage)
 	slog.Info("Time Done", "time", completionTimeDone)
 	slog.Info("Time prediction", "time", timePrediction.Format("15:04:05"))
