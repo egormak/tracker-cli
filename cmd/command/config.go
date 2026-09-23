@@ -30,7 +30,9 @@ var configCmd = &cobra.Command{
 
 		if taskName == "" {
 			slog.Info("Setting global timer", "minutes", timeMinutes)
-			timer.SetGlobalTime(timeMinutes)
+			if err := timer.SetGlobalTime(timeMinutes); err != nil {
+				return fmt.Errorf("failed to set global timer: %w", err)
+			}
 			return nil
 		}
 

@@ -22,7 +22,9 @@ var timerListSetCmd = &cobra.Command{
 			return fmt.Errorf("count must be greater than zero")
 		}
 
-		timer.TimeListSet(count)
+		if err := timer.TimeListSet(count); err != nil {
+			return fmt.Errorf("failed to set timer list: %w", err)
+		}
 		return nil
 	},
 }

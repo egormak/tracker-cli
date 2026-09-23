@@ -14,12 +14,11 @@ import (
 	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service/task"
-	"tracker_cli/internal/service/timer"
 )
 
 var (
 	backlogRolloversGetter = api.GetRolloverTasks
-	backlogDurationGetter  = timer.TimeDurationGet
+	backlogDurationGetter  = api.TimeDurationGet
 
 	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int, restLimitActive bool) (int, error) {
 		timerObj, err := task.CreateTaskTimerWithSourceDay(rollover.TaskName, duration, rollover.Percent, rollover.SourceDay)
