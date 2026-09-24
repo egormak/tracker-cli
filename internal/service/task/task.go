@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/repository/api"
 
@@ -97,24 +98,94 @@ func CreateTaskTimerWithSourceDay(name string, requestedDuration, percent int, s
 	return CreateTaskTimer(name, requestedDuration, percent)
 }
 
+// GetRampDurationForTask checks task eligibility against warm-up ramp configuration and returns
+// the duration, whether ramp was applied, and the current ramp step.
+func GetRampDurationForTask(taskName, role string) (duration int, isRamp bool, rampStep int) {
+	status, err := api.GetRampStatus()
+	if err != nil {
+		slog.Warn("Failed to get ramp status, falling back to legacy timer duration", "err", err)
+		fallback := api.TimeDurationGet()
+		if fallback <= 0 {
+			fallback = 15
+		}
+		return fallback, false, 0
+	}
+
+	cfg := status.Config
+
+	// 1. Excluded tasks check (highest precedence)
+	for _, excluded := range cfg.ExcludedTasks {
+		if strings.EqualFold(taskName, excluded) || (role != "" && strings.EqualFold(role, excluded)) {
+			fallback := cfg.DefaultRestFallback
+			if fallback <= 0 {
+				fallback = 15
+			}
+			return fallback, false, 0
+		}
+	}
+
+	// 2. Direct enabled tasks check
+	for _, enabled := range cfg.EnabledTasks {
+		if strings.EqualFold(taskName, enabled) {
+			step := status.CurrentStep
+			if step <= 0 {
+				step = 1
+			}
+			return step, true, step
+		}
+	}
+
+	// 3. Enabled roles check
+	for _, enabledRole := range cfg.EnabledRoles {
+		if (role != "" && strings.EqualFold(role, enabledRole)) || strings.EqualFold(taskName, enabledRole) {
+			step := status.CurrentStep
+			if step <= 0 {
+				step = 1
+			}
+			return step, true, step
+		}
+	}
+
+	// 4. Fallback for non-eligible tasks / rest
+	fallback := cfg.DefaultRestFallback
+	if fallback <= 0 {
+		fallback = 15
+	}
+	return fallback, false, 0
+}
+
 // CreateTaskTimerWithPercentFlag initializes a TaskTimer object indicating whether the percent flag was explicitly specified
 func CreateTaskTimerWithPercentFlag(name string, requestedDuration, percent int, percentSpecified bool) (*TaskTimer, error) {
 	taskParams := api.GetTaskParams(name)
 	taskDone := api.StatisticTaskGet(name)
-	apiDuration := api.TimeDurationGet()
+	role := api.TaskRoleGet(name)
 
-	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone, apiDuration, percentSpecified)
+	var defaultDuration int
+	var isRamp bool
+	var rampStep int
+
+	if requestedDuration == 0 {
+		defaultDuration, isRamp, rampStep = GetRampDurationForTask(name, role)
+	} else {
+		defaultDuration = api.TimeDurationGet()
+	}
+
+	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone, defaultDuration, percentSpecified)
 	if err != nil {
 		return nil, fmt.Errorf("calculate duration: %w", err)
 	}
 
-	// Return a new TaskTimer object
-	return &TaskTimer{
+	timer := &TaskTimer{
 		Name:         name,
-		Role:         api.TaskRoleGet(name),
+		Role:         role,
 		TimeDuration: duration,
 		Percent:      percent,
-	}, nil
+	}
+	if isRamp {
+		timer.RampStep = rampStep
+	}
+
+	return timer, nil
 }
 
 // calculateDuration determines the appropriate time duration for any task based on schedule, percent, time done, and explicit flags
@@ -201,6 +272,7 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 
 	// Determine duration to use
 	var duration int
+	var rampStep int
 	if requestedTime > 0 {
 		// Use user-requested time, but cap at timeLeft if available
 		if timeLeft > 0 && timeLeft < requestedTime {
@@ -208,17 +280,17 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 		} else {
 			duration = requestedTime
 		}
-	} else if timeLeft > 0 {
-		// Use timeLeft from schedule, but cap at default timer duration
-		defaultDuration := api.TimeDurationGet()
-		if timeLeft < defaultDuration {
+	} else {
+		role := api.TaskRoleGet(taskName)
+		rampDur, isRamp, step := GetRampDurationForTask(taskName, role)
+		if timeLeft > 0 && timeLeft < rampDur {
 			duration = timeLeft
 		} else {
-			duration = defaultDuration
+			duration = rampDur
 		}
-	} else {
-		// Fall back to default duration
-		duration = api.TimeDurationGet()
+		if isRamp {
+			rampStep = step
+		}
 	}
 
 	// Create task timer
@@ -233,6 +305,9 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 
 	// Set source day from schedule
 	taskApp.SourceDay = finalSourceDay
+	if rampStep > 0 {
+		taskApp.RampStep = rampStep
+	}
 
 	slog.Info("starting scheduled task",
 		"task", taskName,

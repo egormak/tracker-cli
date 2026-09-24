@@ -12,5 +12,6 @@ type TaskTimer struct {
 	Percent         int
 	MsgID           int
 	SourceDay       string // Optional: day this task is from (for rollover tasks)
+	RampStep        int    // Warm-up ramp step if duration was determined by ramp
 	restLimitActive bool
 }

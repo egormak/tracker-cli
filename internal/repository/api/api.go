@@ -14,6 +14,15 @@ var client = http.Client{
 	Timeout: timeout,
 }
 
+// SetClientTransport sets client transport (used in tests) and returns a cleanup func.
+func SetClientTransport(tr http.RoundTripper) func() {
+	old := client.Transport
+	client.Transport = tr
+	return func() {
+		client.Transport = old
+	}
+}
+
 func sendRequest(method, path string, body io.Reader) (io.ReadCloser, error) {
 
 	url := fmt.Sprintf("%s%s", config.TrackerDomain, path)

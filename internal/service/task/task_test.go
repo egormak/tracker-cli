@@ -1,10 +1,20 @@
 package task
 
 import (
+	"bytes"
 	"errors"
+	"io"
+	"net/http"
 	"testing"
 	"tracker_cli/internal/domain/entity"
+	"tracker_cli/internal/repository/api"
 )
+
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func TestCalculateDuration(t *testing.T) {
 	tests := []struct {
@@ -120,5 +130,65 @@ func TestCalculateTimeLeft(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("calculateTimeLeft(%d, %d, %d) = %d, want %d", tt.planDuration, tt.percent, tt.done, got, tt.want)
 		}
+	}
+}
+
+func TestGetRampDurationForTask(t *testing.T) {
+	cleanup := api.SetClientTransport(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Method == "GET" && req.URL.Path == "/api/v1/ramp/status" {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(bytes.NewBufferString(`{
+					"current_step": 4,
+					"cap_minutes": 25,
+					"is_capped": false,
+					"today_focus_minutes": 8,
+					"date": "23 September 2026",
+					"config": {
+						"cap_minutes": 25,
+						"enabled_roles": ["work", "learn"],
+						"enabled_tasks": ["home_task"],
+						"excluded_tasks": ["video", "movies", "games", "telegram"],
+						"default_rest_fallback": 15
+					}
+				}`)),
+				Header: make(http.Header),
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+			Header:     make(http.Header),
+		}, nil
+	}))
+	defer cleanup()
+
+	tests := []struct {
+		taskName string
+		role     string
+		wantDur  int
+		wantRamp bool
+		wantStep int
+	}{
+		{taskName: "work", role: "work", wantDur: 4, wantRamp: true, wantStep: 4},
+		{taskName: "learn", role: "learn", wantDur: 4, wantRamp: true, wantStep: 4},
+		{taskName: "coding", role: "work", wantDur: 4, wantRamp: true, wantStep: 4},
+		{taskName: "reading", role: "learn", wantDur: 4, wantRamp: true, wantStep: 4},
+		{taskName: "home_task", role: "", wantDur: 4, wantRamp: true, wantStep: 4},
+		{taskName: "video", role: "rest", wantDur: 15, wantRamp: false, wantStep: 0},
+		{taskName: "movies", role: "rest", wantDur: 15, wantRamp: false, wantStep: 0},
+		{taskName: "games", role: "rest", wantDur: 15, wantRamp: false, wantStep: 0},
+		{taskName: "telegram", role: "rest", wantDur: 15, wantRamp: false, wantStep: 0},
+		{taskName: "relax", role: "rest", wantDur: 15, wantRamp: false, wantStep: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.taskName, func(t *testing.T) {
+			dur, isRamp, step := GetRampDurationForTask(tt.taskName, tt.role)
+			if dur != tt.wantDur || isRamp != tt.wantRamp || step != tt.wantStep {
+				t.Errorf("GetRampDurationForTask(%q, %q) = (%d, %v, %d); want (%d, %v, %d)",
+					tt.taskName, tt.role, dur, isRamp, step, tt.wantDur, tt.wantRamp, tt.wantStep)
+			}
+		})
 	}
 }

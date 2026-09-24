@@ -36,6 +36,7 @@ type DashboardModel struct {
 	restUnits     int
 	scheduledTime int
 	completedTime int
+	ramp          entity.RampStatus
 	tableModel    table.Model
 	statusMsg     string
 	errMsg        string
@@ -55,6 +56,7 @@ type dataLoadedMsg struct {
 	restUnits     int
 	scheduledTime int
 	completedTime int
+	ramp          entity.RampStatus
 	err           error
 }
 
@@ -97,6 +99,12 @@ func fetchDashboardDataCmd() tea.Cmd {
 		// 6. Evening Focus
 		ef, _ := api.GetEveningFocus("", 20)
 		msg.eveningFocus = ef
+
+		// 7. Warm-Up Ramp Status
+		ramp, err := api.GetRampStatus()
+		if err == nil {
+			msg.ramp = ramp
+		}
 
 		return msg
 	}
@@ -168,6 +176,7 @@ func (m DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scheduledTime = msg.scheduledTime
 		m.completedTime = msg.completedTime
 		m.eveningFocus = msg.eveningFocus
+		m.ramp = msg.ramp
 
 		// Build table rows
 		var rows []table.Row
@@ -226,7 +235,11 @@ func (m DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "r":
 			m.loading = true
-			m.statusMsg = "Refreshing data..."
+			if _, err := api.ResetRamp(); err != nil {
+				m.statusMsg = "Failed to reset ramp"
+			} else {
+				m.statusMsg = "⚡️ Ramp reset to 1m"
+			}
 			return m, fetchDashboardDataCmd()
 
 		case " ":
@@ -459,7 +472,13 @@ func (m DashboardModel) renderFooter() string {
 	if m.errMsg != "" {
 		status = lipgloss.NewStyle().Foreground(theme.ColorDanger).Render("Error: " + m.errMsg)
 	}
-	help := theme.SubTitleStyle.Render("[Tab/1-4] Switch View • [r] Refresh • [q] Quit")
+
+	rampInfo := ""
+	if m.ramp.CurrentStep > 0 {
+		rampInfo = fmt.Sprintf("⚡️ Ramp: %dm (Cap %dm) [r: reset]  •  ", m.ramp.CurrentStep, m.ramp.CapMinutes)
+	}
+
+	help := theme.SubTitleStyle.Render(fmt.Sprintf("%s[Tab/1-4] Switch View • [r] Reset Ramp • [q] Quit", rampInfo))
 	if status != "" {
 		return lipgloss.JoinVertical(lipgloss.Left, "", lipgloss.NewStyle().Foreground(theme.ColorWarning).Render(status), help)
 	}

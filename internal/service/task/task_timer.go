@@ -341,6 +341,9 @@ func (m teaTimerModel) View() string {
 	if m.task.SourceDay != "" {
 		taskInfo = fmt.Sprintf("%s (rollover from %s)", taskInfo, m.task.SourceDay)
 	}
+	if m.task.RampStep > 0 {
+		taskInfo = fmt.Sprintf("%s  ⚡️ Warm-Up Step: %d min", taskInfo, m.task.RampStep)
+	}
 
 	view := fmt.Sprintf(
 		"%s\nStatus: %s\nElapsed: %s\nRemaining: %s\n\n",
