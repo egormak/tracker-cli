@@ -57,4 +57,3 @@ func GetCompletionTimeDoneToday() (int, error) {
 
 	return timerDone["time_done"], nil
 }
-

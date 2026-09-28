@@ -180,5 +180,3 @@ func AdjustRunningTask(taskName string, deltaMinutes int) (entity.RunningTask, e
 
 	return resp.Data, nil
 }
-
-

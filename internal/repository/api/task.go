@@ -93,4 +93,3 @@ func GetTaskList() ([]entity.TaskList, error) {
 	}
 	return taskList, nil
 }
-

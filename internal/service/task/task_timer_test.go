@@ -209,4 +209,3 @@ func TestTeaTimerModel_WSEventMsg_TaskPausedAndResumed(t *testing.T) {
 		t.Errorf("expected isRunning true after resume event, got false")
 	}
 }
-

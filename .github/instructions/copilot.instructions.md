@@ -6,7 +6,7 @@ applyTo: '**'
 
 ## Project Overview
 
-This is a **time tracking CLI application** written in Go that helps users track tasks, manage timers, and view statistics. The application follows a **clean architecture** pattern with clear separation of concerns between domain, application, and infrastructure layers.
+This is a **time tracking CLI and Terminal UI (TUI) application** written in Go that acts as a client for `tracker-server`. It has **no local database or state**; all business state lives on the backend and is managed via REST API calls and real-time WebSocket events.
 
 ## Architecture
 
@@ -15,434 +15,152 @@ This is a **time tracking CLI application** written in Go that helps users track
 cmd/
 ├── app/                    # Application entry point (main.go)
 └── command/                # Cobra CLI command definitions
-    ├── root.go            # Root command and Execute()
-    ├── task.go            # Task execution command
-    ├── taskadd.go         # Add task command
-    ├── tasklist.go        # List tasks command
-    ├── manager.go         # Clean/manager command
-    ├── statistic.go       # Statistics display command
-    ├── rest.go            # Rest time management
-    ├── plan.go            # Plan parent command
-    └── plan_percent.go    # Percentage-based planning
+    ├── root.go             # Root command and Execute()
+    ├── task.go             # Task timer command
+    ├── taskadd.go          # Add task command
+    ├── tasklist.go         # List tasks table
+    ├── menu.go             # Interactive task picker
+    ├── dashboard.go        # Live full-screen TUI dashboard
+    ├── evening.go          # Evening Catch-Up sprint & combo
+    ├── session.go          # Schedule-aware percent batch session
+    ├── plan.go             # Plan parent command
+    ├── plan_percent.go     # Percent-based planning commands (run, schedule, set)
+    ├── plan_backlog.go     # Backlog/rollover planning commands
+    ├── schedule.go         # Weekly schedule adjustment & rollover commands
+    ├── ramp.go             # Linear warm-up ramp ladder commands
+    ├── rest.go             # Rest management commands (spend, reset)
+    ├── statistic.go        # Statistics display command
+    ├── config.go           # Global timer and task parameter configuration
+    ├── role_recheck.go     # Recalculate role statistics
+    ├── timer_list_set.go   # Seed backend timer slots
+    └── manager.go          # Backend data cleanup
 
 internal/
 ├── domain/
-│   ├── entity/            # Core business entities
-│   │   ├── task.go       # Task*, TaskList, TaskParams structs
-│   │   ├── role.go       # RoleAnswer struct
-│   │   ├── statistic.go  # TaskTimeDurationResponse
-│   │   ├── timers.go     # Timer-related entities
-│   │   └── general.go    # General/shared entities
-│   └── repository/       # Repository interfaces (currently empty)
+│   └── entity/             # Shared DTOs for API requests/responses
+│       ├── task.go         # Task*, TaskList, TaskParams, TaskRecord
+│       ├── role.go         # RoleAnswer struct
+│       ├── statistic.go    # TaskTimeDurationResponse
+│       ├── timers.go       # RunningTask and timer entities
+│       ├── evening.go      # EveningFocusCandidate entities
+│       ├── ramp.go         # RampStatus and ramp requests
+│       ├── schedule.go     # Schedule entities
+│       └── general.go      # Shared general entities
 ├── repository/
-│   └── api/              # External API communication implementations
-│       ├── api.go        # sendRequest() - centralized HTTP client
-│       ├── task.go       # GetTaskParams, AddTaskRecord, GetTaskRecords
-│       ├── statistic.go  # StatisticTaskGet
-│       ├── role.go       # TaskRoleGet
-│       ├── timer.go      # Timer-related API calls
-│       ├── plan_percent.go # Percentage planning API
-│       ├── procents.go   # Percentage management
-│       ├── rest.go       # Rest time API
-│       └── clean_data.go # Data cleanup operations
-├── service/              # Business logic layer
-│   ├── task/            # Task management services
-│   │   ├── task.go      # TaskRun, CreateTaskTimer, duration calculation
-│   │   ├── task_timer.go # TaskTimer.Run(), Start(), Stop()
-│   │   ├── task_structure.go # TaskTimer struct definition
-│   │   └── task_methods.go # Task helper methods
-│   ├── task_params/     # Task parameters management (time, priority)
-│   ├── timer/           # Timer management (2 files: timer.go and ../timer.go)
-│   ├── telegram/        # Telegram notification integration
-│   ├── statistic/       # Statistics calculation and display
-│   │   ├── statistic.go # Main statistics logic
-│   │   └── tasklist.go  # Task list display
-│   ├── rest/            # Rest time tracking
-│   ├── menu/            # Interactive Bubble Tea menu
-│   │   ├── menu.go     # RunMenu() - interactive task selector
-│   │   └── const_values.go # Menu constants
-│   ├── plan/            # Planning features
-│   ├── procent/         # Percentage calculations
-│   │   ├── set.go      # Set percentages
-│   │   └── change.go   # Change percentages
-│   ├── role/            # Role management
-│   └── manager/         # Cleanup and management tasks
-├── interface/
-│   └── cli/           # CLI interface utilities (currently empty)
-└── pkg/               # Shared utilities
-    ├── day_method/    # Day-related utility functions
-    └── restutil/      # Rest-related utilities
+│   ├── api/                # External REST API client implementations
+│   │   ├── api.go          # Centralized sendRequest() & SetClientTransport()
+│   │   ├── running_task.go # Start, status, pause, resume, stop, adjust, heartbeat
+│   │   ├── task.go         # GetTaskParams, AddTaskRecord, GetTaskRecords
+│   │   ├── plan_percent.go # Percentage planning endpoints
+│   │   ├── procents.go     # Role percentage distributions
+│   │   ├── schedule.go     # Schedule adjust, set, rollover
+│   │   ├── evening.go      # Evening focus and skip endpoints
+│   │   ├── ramp.go         # Warm-up ramp API
+│   │   ├── rest.go         # Rest balance endpoints
+│   │   ├── statistic.go    # Completion stats
+│   │   ├── role.go         # Task role endpoints
+│   │   ├── timer.go        # Timer count endpoints
+│   │   └── clean_data.go   # Data cleanup operations
+│   └── ws/                 # WebSocket client
+│       └── client.go       # Reconnecting client for /api/v1/timer/ws
+├── service/                # Business logic and interactive TUI models
+│   ├── task/               # Task timer execution and Bubble Tea model
+│   ├── dashboard/          # Full-screen live dashboard TUI
+│   ├── evening/            # Evening Catch-Up TUI and combo chain
+│   ├── menu/               # Interactive task picker table
+│   ├── plan/               # Percent and backlog planning loops with batching
+│   ├── procent/            # Percentage management and distribution
+│   ├── task_params/        # Task parameter configuration
+│   ├── statistic/          # Statistics formatting and display
+│   ├── rest/               # Rest tracking and conversion
+│   ├── role/               # Role management
+│   ├── timer/              # Timer management
+│   ├── telegram/           # Telegram notifications
+│   └── manager/            # Backend cleanup service
+├── ui/
+│   └── theme/              # Shared Lipgloss colors, styles, and role badges
+└── pkg/
+    ├── restutil/           # Rest unit conversion (units = minutes * 100)
+    ├── notifier/           # Desktop notifications and terminal bell
+    └── day_method/         # Day and date utility functions
 
 config/
-└── config.go          # TrackerDomain constant configuration
+└── config.go               # TrackerDomain constant configuration
 
 test/
-└── main.go           # Bubble Tea UI experiments/demos
+└── main.go                 # Bubble Tea UI experiments/demos (not automated tests)
 ```
 
 ### Key Technologies
-- **Go 1.22** - Primary language with toolchain
-- **Cobra** - CLI framework for commands and flags (`github.com/spf13/cobra`)
-- **Bubble Tea** - Terminal UI framework (`github.com/charmbracelet/bubbletea`)
-- **Bubbles** - Terminal UI components (`github.com/charmbracelet/bubbles`)
-- **Lipgloss** - Terminal styling (`github.com/charmbracelet/lipgloss`)
-- **slog** - Structured logging (stdlib)
-- **tint** - Colored slog output (`github.com/lmittmann/tint`)
-- **HTTP Client** - Standard library net/http for REST API communication
-
-### Application Flow
-1. **Entry**: `cmd/app/main.go` initializes slog with tint handler and calls `command.Execute()`
-2. **Routing**: `cmd/command/root.go` defines the root Cobra command tree
-3. **Execution**: Command handlers in `cmd/command/*.go` delegate to services in `internal/service/`
-4. **Business Logic**: Services in `internal/service/*` implement core functionality
-5. **Data Access**: Services call `internal/repository/api/*` for external API communication
-6. **API Layer**: `internal/repository/api/api.go` provides centralized `sendRequest()` function
+- **Go 1.23.0** - Primary language
+- **Cobra** - CLI command framework (`github.com/spf13/cobra`)
+- **Bubble Tea & Lipgloss** - Terminal UI framework and styling (`github.com/charmbracelet/bubbletea`, `lipgloss`)
+- **Gorilla WebSocket** - Real-time event streaming (`github.com/gorilla/websocket`)
+- **slog & tint** - Structured colorized logging (stdlib `log/slog` + `github.com/lmittmann/tint`)
+- **HTTP Client** - Standard library `net/http` configured with 15s timeout
 
 ## Coding Standards
 
 ### Go Conventions
-- Follow standard Go naming conventions (camelCase for private, PascalCase for public)
-- Use meaningful package names that reflect their purpose
-- Implement proper error handling with structured logging
-- Use Go modules for dependency management
-- Run `go fmt ./...` before committing
-- Keep packages focused on single responsibilities
+- Follow standard Go naming conventions (camelCase for unexported, PascalCase for exported).
+- Run `go fmt ./...` before committing.
+- Prefer structured logging via `slog` over `fmt.Printf` in runtime paths.
+- Return wrapped errors with context: `fmt.Errorf("description: %w", err)`.
 
-### Error Handling
-- Use structured logging with `slog` for consistent error reporting
-- Include context in error messages: `slog.Error("operation failed", "error", err, "context", value)`
-- **Critical Operations**: Exit with `os.Exit(1)` on unrecoverable errors (API failures, JSON decode errors)
-- **Command Handlers**: Return errors from RunE handlers for Cobra to handle
-- **Service Layer**: Return wrapped errors with context: `fmt.Errorf("description: %w", err)`
-- Define custom error variables for business logic: `var ErrTaskCompleted = fmt.Errorf("no time remaining for this task")`
-- Use `errors.Is()` to check for specific error types
+### HTTP & WebSocket Communication
+- Centralize API calls in `internal/repository/api/` using `sendRequest()` in `api.go`.
+- Avoid creating inline `http.Client`s in service packages.
+- Always handle JSON encoding/decoding within the repository layer and return domain entities.
+- WebSocket events (`internal/repository/ws/client.go`) handle real-time timer updates across clients.
 
-### HTTP Communication
-- All external API calls go through the `internal/repository/api/` package
-- Use the centralized `sendRequest` function in `internal/repository/api/api.go`
-- Set appropriate timeouts (15 seconds default)
-- Handle HTTP status codes properly:
-  - 200: Success
-  - 404: Not Found
-  - 500: Internal Server Error
-- Use proper JSON marshaling/unmarshaling with struct tags
-- Always defer `resp.Body.Close()` when reading response bodies
-- Set headers: `Content-Type: application/json` and `Accept: application/json`
+### Rest-Time Units
+- The backend stores and returns rest time as integer "units" where `units = minutes * 100`.
+- Always convert using `internal/pkg/restutil` (`MinutesFromUnits` / `UnitsFromMinutes`).
 
-### CLI Commands
-- Each command should be in its own file in `cmd/command/`
-- Use Cobra's flag system for parameters with short and long forms
-- Mark required flags: `cmd.MarkFlagRequired("flag")`
-- Provide clear help text in `Use` and `Short` fields
-- Use `RunE` for commands that can return errors, `Run` for commands that cannot
-- Initialize commands in `init()` functions and register with `rootCmd.AddCommand(cmd)`
-- Follow the pattern: `var cmdName = &cobra.Command{...}`
+### Universal Task Duration Logic
+- Duration calculations MUST be universal across all tasks. Never hardcode specific task names.
+- Explicit `-t <minutes>`: Respect requested duration for manual scheduling.
+- Omitted `-t`: Calculate `timeLeft = (params.Time * percent) / 100 - done`. If `timeLeft <= 0`, return `task.ErrTaskCompleted`. Otherwise session duration is `min(defaultDuration, timeLeft)`.
 
-### Entity Design
-- Keep entities in `internal/domain/entity/` 
-- Use proper JSON tags for API communication: `json:"field_name"`
-- Separate request/response structures when needed (e.g., `TaskRecorcRequest`)
-- Include time.Time fields for temporal data
-- Keep entities focused on data structure, not behavior
-- Use descriptive struct names that indicate purpose (e.g., `TaskTimeDurationResponse`)
+### Server-Authoritative Timer Lifecycle
+1. `TaskTimer.Run()` initiates tracking on the backend via `POST /api/v1/timer/run/start`.
+2. Connects to `ws.Client` for live events (`TASK_STARTED`, `TASK_PAUSED`, `TASK_RESUMED`, `TASK_STOPPED`, `TASK_ADJUSTED`).
+3. Fallback polling queries `GET /api/v1/timer/run/status` every 1.5 seconds.
+4. Liveness heartbeat calls `POST /api/v1/timer/run/heartbeat` every 20 seconds.
+5. Local 1s tick smoothly decrements display countdown between server events.
+6. Actions:
+   - `p`: Toggle pause/resume (`POST /api/v1/timer/run/pause` / `.../resume`).
+   - Duration adjustment: `POST /api/v1/timer/run/adjust`.
+   - `enter` / `q`: Stop task cleanly (`POST /api/v1/timer/run/stop`).
+   - `ctrl+c`: Abort task (`POST /api/v1/timer/run/stop` + returns `task.ErrTaskAborted`).
+7. Completion: Sends Telegram notification, fires desktop notification (`notifier.Send`), and prints stats/rest.
 
-### Service Layer
-- Business logic goes in `internal/service/` subdirectories organized by domain
-- Each service package should focus on a single domain area (task, timer, statistics, menu, etc.)
-- Services coordinate between repositories and implement business rules
-- Keep service functions cohesive and focused
-- Extract helper functions for calculations (e.g., `calculateDuration`, `calculateTimeLeft`)
-- Services should accept Cobra command context when used as command handlers
-- Keep complex logic in services, not in command files
+### Testing Guidelines
+- Unit tests must be deterministic and never call a live backend:
+  - For HTTP API testing, use `api.SetClientTransport(mockTransport)` in `internal/repository/api/api.go`.
+  - For planning loops, use package-level function variables (e.g. `percentTaskSelector`, `percentTimerRunner`, `backlogTimerRunner`).
+- Place tests next to code in `*_test.go` files using table-driven tests.
 
-### Repository Layer
-- All repository implementations in `internal/repository/api/`
-- Use the centralized `sendRequest()` function from `api.go`
-- Handle JSON encoding/decoding within repository functions
-- Return domain entities, not raw HTTP responses
-- Log errors with context before returning or exiting
-- Keep repository functions focused on single API operations
+## Available CLI Commands
 
-## Specific Guidelines
-
-### Task Management
-- **Task Structure**: Tasks have name, role, duration, time begin/end, time done, percent, and Telegram message ID
-- **Task Types**: 
-  - `TaskManager`: Full task with timing and tracking
-  - `TaskParams`: Task planning parameters (name, time, priority)
-  - `TaskList`: Task list view with statistics
-  - `TaskRecorcRequest`: Recording task completion
-- **Duration Calculation (Universal Rule)**: 
-  - **No Hardcoded Task Names**: All duration calculations MUST be 100% universal across all tasks. Never hardcode specific task names (e.g. `"work"`, `"english"`) in calculation logic.
-  - **Explicit Requested Duration (`-t <minutes>`)**: When explicit duration `-t` is requested by the user (`requested > 0`), honor the requested duration so manual soft-schedule runs can proceed and record for today.
-  - **Automatic/Unspecified Duration (`requested == 0`)**: Calculate `timeLeft = (params.Time * percent) / 100 - done`. If `timeLeft <= 0`, return `ErrTaskCompleted`. Otherwise cap default session length to `min(apiDefaultDuration, timeLeft)`.
-- **Task Execution Flow**:
-  1. Get task parameters from API
-  2. Get time already spent on task
-  3. Calculate duration for this session
-  4. Create TaskTimer and run
-  5. Send Telegram start notification
-  6. Run timer loop (minute by minute)
-  7. Handle interruption signals gracefully
-  8. Record time done to API
-  9. Show statistics
-  10. Send Telegram completion notification
-
-### Timer Functionality
-- **Signal Handling**: Implement graceful shutdown for SIGTERM and SIGINT
-- **Timer Loop**: Sleep one minute per iteration, log progress
-- **Timer Lifecycle**:
-  - `Start()`: Sends Telegram start message, runs timer loop
-  - `Stop()`: Calculates time done, records to API, shows stats, sends Telegram stop message
-  - `Run()`: Sets up signal handling and coordinates Start/Stop
-- **Background Process**: Use goroutine with channel communication for signal handling
-- **Cleanup**: Always call `timer.TimeDurationDel()` after completion
-- **Telegram Integration**: Track message ID to update Telegram notifications
-
-### Interactive Menu System
-- **Bubble Tea**: Use for interactive task selection in `internal/service/menu/menu.go`
-- **Table Component**: Display tasks with columns: Name, Role, Priority, Duration, Done, Left
-- **Keyboard Navigation**:
-  - Arrow keys: Navigate table rows
-  - Enter: Select task and return name
-  - Q/Ctrl+C: Quit without selection
-- **Styling**: Use Lipgloss for borders, colors, and highlighting
-- **Data Source**: Fetch task list from `/api/v1/tasklist` endpoint
-- **Sorting**: Sort tasks by priority (descending)
-- **Return Value**: Return selected task name or empty string if cancelled
-
-### Statistics & Planning
-- **Statistics Display**: Show task-specific and full day statistics
-- **Rest Tracking**: Track and display rest time separately
-- **Percentage Planning**: Support percentage-based task completion planning
-- **API Endpoints** (Preferred):
-  - `/api/v1/task/params?task_name=X`: Get task planning parameters
-  - `/api/v1/taskrecord`: POST to record completed time (supports source_day for rollover tasks)
-  - `/api/v1/stats/done/today`: GET today's completion statistics
-  - `/api/v1/stats/tasks/today`: GET today's tasks (planned vs done)
-  - `/api/v1/task/plan/percent`: GET next task by percent
-  - `/api/v1/task/plan/percent/schedule`: GET next task with schedule awareness (includes source_day)
-- **Legacy Endpoints** (Deprecated but still supported):
-  - `/api/v1/record/task-day?task_name=X`: Get time spent on specific task today
-  - `/api/v1/record`: POST to record completed time (redirects to /api/v1/taskrecord)
-  - `/api/v1/records`: GET all task records summary
-
-### Telegram Notifications
-- **Start Notification**: Send task name, receive message ID
-- **Stop Notification**: Update message with task name, time done, end time
-- **API Endpoints**:
-  - `/api/v1/manage/telegram/start`: POST with task_name
-  - `/api/v1/manage/telegram/stop`: POST with task_name, msg_id, time_done, time_end
-- **Time Format**: Use "2 January 2006 15:04" for end time display
-
-### Configuration
-- Centralize configuration in `config/config.go`
-- Current TrackerDomain: `http://127.0.0.1:3000` (local development)
-- Production endpoint available (commented out): `http://tracker.makegorka.com:8080`
-- Switch between endpoints by commenting/uncommenting in config.go
-- No environment variables or config files currently used
-
-### Testing
-- Write tests for business logic in service layer
-- Mock external dependencies (HTTP calls)
-- Test error conditions and edge cases (e.g., task completed, no time left)
-- Use table-driven tests for multiple scenarios
-- Test files go in `test/` directory or alongside code as `*_test.go`
-
-### Documentation
-- Include clear comments for exported functions
-- Document complex business logic (especially duration calculations)
-- Provide usage examples in CLI help text
-- Maintain README with build and usage instructions
-- Document API endpoints and request/response formats
-
-## Common Patterns
-
-### HTTP Request Pattern
-```go
-func SomeAPICall(param string) (entity.Entity, error) {
-    var result entity.Entity
-    
-    responseBody, err := sendRequest("GET", fmt.Sprintf("/api/v1/path?param=%s", param), nil)
-    if err != nil {
-        slog.Error("request error", "error", err)
-        os.Exit(1)
-    }
-    
-    err = json.NewDecoder(responseBody).Decode(&result)
-    if err != nil {
-        slog.Error("failed to decode response", "error", err)
-        os.Exit(1)
-    }
-    
-    return result, nil
-}
-```
-
-### HTTP POST Pattern
-```go
-func SomeAPIPost(data entity.Request) entity.Response {
-    var result entity.Response
-    
-    jsonData, err := json.Marshal(&data)
-    if err != nil {
-        slog.Error("can't marshal JSON", "error", err)
-        os.Exit(1)
-    }
-    
-    responseBody, err := sendRequest("POST", "/api/v1/path", bytes.NewBuffer(jsonData))
-    if err != nil {
-        slog.Error("request error", "error", err)
-        os.Exit(1)
-    }
-    
-    err = json.NewDecoder(responseBody).Decode(&result)
-    if err != nil {
-        slog.Error("failed to decode response", "error", err)
-        os.Exit(1)
-    }
-    
-    return result
-}
-```
-
-### CLI Command Pattern
-```go
-var someCmd = &cobra.Command{
-    Use:   "command-name",
-    Short: "Brief description",
-    RunE:  handlerFunction,
-}
-
-func init() {
-    someCmd.Flags().StringP("name", "n", "", "Parameter description")
-    someCmd.Flags().IntP("time", "t", 0, "Time duration")
-    someCmd.MarkFlagRequired("name")
-    rootCmd.AddCommand(someCmd)
-}
-
-func handlerFunction(cmd *cobra.Command, args []string) error {
-    name, err := cmd.Flags().GetString("name")
-    if err != nil {
-        return fmt.Errorf("read name flag: %w", err)
-    }
-    // ... implementation
-    return nil
-}
-```
-
-### Logging Pattern
-```go
-slog.Info("operation started", "param", value)
-slog.Info(fmt.Sprintf("Progress: %d/%d", current, total))
-slog.Error("operation failed", "error", err, "context", additionalInfo)
-```
-
-### Signal Handling Pattern
-```go
-func (t *TaskTimer) Run() error {
-    exitCh := make(chan os.Signal)
-    signal.Notify(exitCh, syscall.SIGTERM, syscall.SIGINT)
-    
-    go func() {
-        defer func() {
-            exitCh <- syscall.SIGTERM
-        }()
-        t.Start()
-    }()
-    
-    <-exitCh
-    t.Stop()
-    return nil
-}
-```
-
-## Development Workflow
-
-1. **Add New Entity**: Define struct in `internal/domain/entity/*.go` with JSON tags
-2. **Implement Repository**: Add API function in `internal/repository/api/*.go`
-3. **Create Service Logic**: Implement business logic in `internal/service/*/`
-4. **Add CLI Command**: Create command file in `cmd/command/*.go`
-5. **Register Command**: Add to root command in `init()` function
-6. **Test**: Run `go test ./...` and manual testing with `go run ./cmd/app/main.go`
-7. **Build**: Run `go build -o tracker ./cmd/app/main.go`
-8. **Install**: Move binary to `/usr/local/bin/tracker` for global access
-
-## Build and Run
-
-### Build Binary
-```bash
-go build -o tracker ./cmd/app/main.go
-sudo mv tracker /usr/local/bin/tracker
-```
-
-### Development Run
-```bash
-go run ./cmd/app/main.go --help
-go run ./cmd/app/main.go task --name "Task Name" --time 25
-```
-
-### Testing
-```bash
-go test ./...
-go test ./internal/service/task/...
-```
-
-### MongoDB (for testing)
-```bash
-docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db mongo:5.0.6
-```
-
-## Available Commands
-
-- `tracker task -n "name" [-t time] [-p percent]` - Run a task timer
-- `tracker task -n "name" --previous-days` - Run a task from previous days with schedule awareness (searches Monday to today, similar to `plan percent schedule` but for a specific task)
-- `tracker taskadd` - Add a new task (interactive or with flags)
-- `tracker tasklist` - List all tasks
-- `tracker statistic` - Show statistics for the day
-- `tracker rest-spend -d duration` - Record rest time
-- `tracker plan` - Parent command for planning features
-- `tracker clean` - Clean/manage data
-- Use `--help` on any command for detailed usage
-
-## External Dependencies
-
-### Primary Tracker Service
-- **Current Domain**: `http://127.0.0.1:3000` (local development, active in config)
-- **Production Domain**: `http://tracker.makegorka.com:8080` (commented out in config)
-- **Protocol**: HTTP (not HTTPS)
-- **Base URL**: Configured in `config/config.go` as `TrackerDomain`
-
-### API Endpoints (Primary - Preferred)
-- `GET /api/v1/task/params?task_name=X` - Get task parameters
-- `POST /api/v1/taskrecord` - Record completed task time (with source_day support)
-- `GET /api/v1/stats/done/today` - Get today's completion statistics
-- `GET /api/v1/stats/tasks/today` - Get today's tasks (planned vs done)
-- `GET /api/v1/task/plan/percent` - Get next task by percent
-- `GET /api/v1/task/plan/percent/schedule` - Get next task with schedule awareness
-- `GET /api/v1/task/plan/percent/schedule?task_name=X` - Get specific task with schedule awareness (searches Monday to today)
-- `GET /api/v1/task/plan-percent/change` - Change percent plan
-- `POST /api/v1/manage/procents` - Manage percents
-- `GET /api/v1/tasklist` - List all tasks with statistics
-- `GET /api/v1/timer/get` - Get default timer duration
-- `POST /api/v1/timer/set` - Set timer count
-- `POST /api/v1/timer/del` - Delete timer count
-- `POST /api/v1/manage/telegram/start` - Start Telegram notification
-- `POST /api/v1/manage/telegram/stop` - Stop Telegram notification
-- `GET /api/v1/manage/timer/recheck` - Recheck timer state
-- `GET /api/v1/role/get?task_name=X` - Get task role
-- `GET /api/v1/roles/records` - Get all roles
-- `GET /api/v1/rest-get` - Get rest time
-- `GET /api/v1/records/clean` - Clean records
-
-### API Endpoints (Task Parameters - task_params service)
-- `GET /api/v1/record/params?task_name=X` - Get task parameters (time, priority)
-- `POST /api/v1/record/params` - Set task parameters (time_duration, priority)
-
-### API Endpoints (Legacy - Still Supported)
-- `GET /api/v1/record/task-day?task_name=X` - Get today's time for task (deprecated, use /api/v1/task/params)
-- `POST /api/v1/record` - Record task time (deprecated, redirects to /api/v1/taskrecord)
-- `GET /api/v1/records` - Get records summary (deprecated)
-- `GET /api/v1/task/plan-percent` - Old percent planning endpoint (use /api/v1/task/plan/percent/schedule)
-
-All API interactions must go through the repository layer to maintain separation of concerns and enable easy testing/mocking.
+- `tracker task -n NAME [-t min] [-p percent] [-s source-day] [--previous-days]`: Run a task timer.
+- `tracker menu [-t min] [-p percent]`: Interactive Bubble Tea task picker table, then starts timer.
+- `tracker dashboard` (aliases: `tui`, `dash`): Live full-screen TUI dashboard.
+- `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]`: Evening Catch-Up sprint targeting weekly gaps; `-C` chains the top-3 deficit tasks.
+- `tracker session [duration]` (alias: `batch`): Run a schedule-aware percent batch session (default 30m).
+- `tracker plan percent run|schedule`: Start next task from percent plan (`--delay`, `-r rest-limit`, `-b batch`).
+- `tracker plan percent set --role R --values v1,v2,...`: Update percent distribution for a role.
+- `tracker plan backlog` (aliases: `catchup`, `game`): Sequence through deficit/rollover tasks (`--delay`, `-r rest-limit`, `-b batch`).
+- `tracker schedule adjust <task> <delta-min> [-d day]`: Adjust scheduled minutes for a task.
+- `tracker schedule set <task> <target-min> [-d day]`: Set scheduled target minutes for a task.
+- `tracker schedule rollover`: View rollover deficit tasks.
+- `tracker ramp [status|reset|set-cap <minutes>]`: Warm-up ramp ladder management.
+- `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`: Add a new task under a role.
+- `tracker tasklist`: Display full task table.
+- `tracker statistic`: Display today's statistics, completed tasks, and role totals.
+- `tracker rest-spend -d MINUTES`: Record spent rest minutes.
+- `tracker rest reset`: Reset daily rest balance.
+- `tracker config [-n TASK -t MIN -p PRIORITY]`: Configure task parameters or global scheduler time.
+- `tracker timer-list-set -c COUNT`: Seed backend timer slots.
+- `tracker role-recheck`: Recalculate backend role statistics.
+- `tracker clean`: Trigger backend record cleanup.

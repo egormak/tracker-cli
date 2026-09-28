@@ -89,4 +89,3 @@ func init() {
 
 	rootCmd.AddCommand(taskAddCmd)
 }
-

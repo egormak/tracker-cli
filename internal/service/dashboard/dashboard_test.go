@@ -70,4 +70,3 @@ func TestDashboardModel_DataLoadedMsg(t *testing.T) {
 		t.Errorf("expected rest units 1500, got %d", dm.restUnits)
 	}
 }
-

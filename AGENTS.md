@@ -1,32 +1,77 @@
 # Repository Guidelines
 
+## Project Overview
+- **Tracker CLI** is a Go-based command-line interface and Terminal UI (TUI) client for `tracker-server`.
+- **Technologies**: Go 1.23.0, Cobra (`cmd/command`), Bubble Tea & Lipgloss (`internal/ui/theme`, TUIs), gorilla/websocket, slog + tint.
+- **Stateless Architecture**: The CLI has zero local persistence or database. All state lives behind `tracker-server` accessed via REST API (`/api/v1/...`) and live WebSocket (`/api/v1/timer/ws`). Do not add local SQLite/Mongo storage to the CLI.
+
 ## Project Structure & Module Organization
-- `cmd/app/main.go` boots the CLI and delegates to Cobra commands in `cmd/command` (task, rest, statistic, manager).
-- Business logic sits in `internal/service/*` and `internal/application`, with domain contracts in `internal/domain` and adapters in `internal/infrastructure`.
-- Shared utilities live in `internal/pkg`; configuration defaults, including `TrackerDomain`, reside in `config/config.go`.
-- Keep exploratory Bubble Tea demos in `test/main.go`; production tests should live next to the code they exercise.
+- `cmd/app/main.go`: Entry point; sets up `slog` default logger with `tint` handler and runs `command.Execute()`.
+- `cmd/command/`: Individual Cobra CLI command files (`task.go`, `menu.go`, `dashboard.go`, `evening.go`, `session.go`, `plan_percent.go`, `plan_backlog.go`, `schedule.go`, `ramp.go`, `rest.go`, `statistic.go`, etc.). Each command registers itself onto `rootCmd` (or parent) via its `init()` function.
+- `internal/service/<feature>/`: Feature-scoped business logic and Bubble Tea models (`task`, `dashboard`, `evening`, `menu`, `plan`, `procent`, `rest`, `role`, `statistic`, `task_params`, `telegram`, `timer`).
+- `internal/repository/api/`: REST API client layer (`sendRequest` with 15s timeout, JSON headers).
+- `internal/repository/ws/`: Reconnecting WebSocket client for `/api/v1/timer/ws`, broadcasting typed timer events (`TASK_STARTED`, `TASK_PAUSED`, `TASK_RESUMED`, `TASK_STOPPED`, `TASK_ADJUSTED`, `HEARTBEAT_ACK`, `STATE_SYNC`).
+- `internal/domain/entity/`: Shared DTOs for requests and responses between API and service layers.
+- `internal/ui/theme/`: Shared Lipgloss styling, color palette, and role badges. Use this for new TUI elements instead of hardcoding colors.
+- `internal/pkg/`: Shared utility packages:
+  - `restutil`: Rest unit boundary converters (`units = minutes * 100`).
+  - `notifier`: Cross-platform notifications (terminal bell, macOS `osascript`, Linux `notify-send`).
+  - `day_method`: Weekday calculation helpers.
+- `config/config.go`: Holds `TrackerDomain` constant (toggle production `http://tracker.makegorka.com:8080` vs local dev `http://127.0.0.1:3000`).
+- `test/main.go`: Scratchpad for Bubble Tea UI experiments/demos, not an automated test.
 
 ## Build, Test, and Development Commands
-- `go build -o tracker ./cmd/app/main.go` builds the binary; install it manually if you need a global executable.
-- `go run ./cmd/app/main.go --help` quickly inspects the command tree during development.
-- `go test ./...` runs all Go tests; use `-run` to narrow the scope when iterating.
-- `docker run -it --rm -p 27017:27017 -v /home/egorka/Downloads/test_mongo:/data/db mongo:5.0.6` provides the MongoDB instance expected by repository code.
+- `go build -o tracker ./cmd/app/main.go` builds the binary.
+- `go run ./cmd/app/main.go [command]` runs commands directly during development.
+- `go test ./...` runs all unit tests.
+- `go test ./internal/service/plan -run TestRunPercentBatch` runs a specific test or package.
+- `go vet ./...` and `go fmt ./...` should pass before committing.
 
-## Coding Style & Naming Conventions
-- Always run `go fmt ./...`; rely on gofmt tabs, import grouping, and blank-line spacing.
-- Exported APIs use PascalCase, unexported helpers stay camelCase, and new Cobra files mirror their CLI verb (e.g., `task_add.go` for `task-add`).
-- Prefer structured logging via `slog` instead of `fmt.Printf` in runtime paths.
+## Key Development Conventions
 
-## Testing Guidelines
-- Add `_test.go` files in the same package; table-driven tests work well for service rules.
-- Stub interfaces from `internal/domain/repository` to avoid live HTTP or Mongo calls; keep tests deterministic.
-- Ensure `go test ./...` passes before sending a review and document any data fixtures in the PR.
+### 1. Server-Authoritative Task Timer
+- `task.CreateTaskTimer` determines session duration, then `TaskTimer.Run()` starts server tracking via `POST /api/v1/timer/run/start` and opens `ws.Client`.
+- State synchronization operates three ways:
+  1. Live WebSocket events (external pause/resume/stop/adjust).
+  2. Fallback polling: `GET /api/v1/timer/run/status` every 1.5s.
+  3. Liveness heartbeat: `POST /api/v1/timer/run/heartbeat` every 20s.
+  4. Local 1s tick smooths UI display between server updates.
+- Controls: `p` toggles pause/resume; duration changes call `/adjust`; `enter`/`q` stops cleanly; `ctrl+c` aborts. Bubble Tea default signal handling is disabled in favor of a custom SIGINT forwarder sending `interruptMsg` so loops can catch `task.ErrTaskAborted`.
+- On completion: sends Telegram notification (`procent.ChangeGroupPlanPercent`), fires desktop notification, and displays updated statistics and rest.
 
-## Commit & Pull Request Guidelines
-- Match the concise imperative style in history (`Review task command`, `Add task manager`) and keep each commit focused.
-- PRs should describe behaviour changes, list manual verification commands, and link tracker issues when available.
-- Attach terminal captures or screenshots for CLI UI adjustments and tag the maintainer responsible for the touched module.
+### 2. Universal Task Duration Logic
+- Duration calculations MUST be universal across all tasks. Never hardcode specific task names in calculation logic.
+- Explicit `-t <minutes>`: Honors requested duration for manual soft-scheduling.
+- Omitted `-t`: Calculates `timeLeft = (params.Time * percent)/100 - done`. If `timeLeft <= 0`, returns `ErrTaskCompleted`. Otherwise session duration is clamped to `min(defaultDuration, timeLeft)`.
 
-## Configuration & Environment
-- Update `config.TrackerDomain` when switching environments and mention the target URL in your PR notes.
-- Store secrets outside the repo (e.g., local `.env` ignored by git) and document any new ports or Docker services teammates must start.
+### 3. Rest-Time Units
+- The backend stores and returns rest time as integer units (`units = minutes * 100`).
+- Always use `internal/pkg/restutil` (`MinutesFromUnits` / `UnitsFromMinutes`) when sending or displaying rest values.
+
+### 4. API Client Consistency
+- When adding backend calls, implement them in `internal/repository/api/` using `sendRequest` and typed structs, rather than creating inline `http.Client`s in service packages.
+
+### 5. Testing Guidelines
+- Tests must never hit a live backend:
+  - Use `api.SetClientTransport(rt)` in `internal/repository/api` to swap the shared HTTP transport with a mock `http.RoundTripper`.
+  - Use package-level function variables (e.g. `percentTaskSelector`, `percentTimerRunner`, `backlogTimerRunner`) to swap runner logic in loop tests.
+- Keep tests next to code in `*_test.go` files; table-driven tests are preferred.
+
+## Key CLI Commands
+- `tracker task -n NAME [-t min] [-p percent] [-s source-day] [--previous-days]`: Run task timer.
+- `tracker menu [-t min] [-p percent]`: Interactive Bubble Tea task picker table, then starts timer.
+- `tracker dashboard` (aliases: `tui`, `dash`): Live full-screen TUI dashboard.
+- `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]`: Evening Catch-Up mode for biggest weekly-gap task; `-C` chains top-3 candidates.
+- `tracker session [duration]` (alias: `batch`): Schedule-aware percent batch session (default 30m).
+- `tracker plan backlog` (aliases: `catchup`, `game`): Sequence through deficit/rollover tasks (`--delay`, `-r rest-limit`, `-b batch`).
+- `tracker plan percent run|schedule`: Start next task from percent plan (`--delay`, `-r rest-limit`, `-b batch`).
+- `tracker plan percent set --role R --values v1,v2,...`: Update role percent distribution.
+- `tracker schedule adjust <task> <delta-min> [-d day]` / `schedule set <task> <target-min> [-d day]` / `schedule rollover`: Schedule targets and rollover management.
+- `tracker ramp [status|reset|set-cap <minutes>]`: Warm-up ramp ladder controls.
+- `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`: Add a new task under a role.
+- `tracker tasklist`: List all tasks in table format.
+- `tracker statistic`: Display today's statistics and role totals.
+- `tracker rest-spend -d MINUTES`: Record spent rest minutes.
+- `tracker rest reset`: Reset daily rest balance.
+- `tracker config [-n TASK -t MIN -p PRIORITY]`: Configure task parameters or global scheduler time.
+- `tracker timer-list-set`, `tracker role-recheck`, `tracker clean`: Backend maintenance commands.

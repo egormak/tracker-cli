@@ -66,4 +66,3 @@ func UpdateScheduleTaskTime(taskName string, minutes int, mode string, day strin
 	defer body.Close()
 	return nil
 }
-

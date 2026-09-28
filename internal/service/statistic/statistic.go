@@ -50,4 +50,3 @@ func statCompletionPercentage(completionTimeDone, scheduledTimeToday int) float6
 	round := math.Round(percent*100) / 100
 	return round
 }
-
