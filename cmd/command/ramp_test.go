@@ -160,3 +160,34 @@ func TestRampCommand_Execution(t *testing.T) {
 		}
 	})
 }
+
+func TestRampCommand_StatusAfterManualReset(t *testing.T) {
+	cleanup := api.SetClientTransport(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(bytes.NewBufferString(`{
+				"current_step": 2,
+				"cap_minutes": 25,
+				"is_capped": false,
+				"today_focus_minutes": 48,
+				"reset_baseline_minutes": 45,
+				"effective_focus_minutes": 3,
+				"date": "6 October 2026",
+				"config": {"cap_minutes": 25, "enabled_roles": ["work"], "default_rest_fallback": 15}
+			}`)),
+			Header: make(http.Header),
+		}, nil
+	}))
+	defer cleanup()
+
+	buf := new(bytes.Buffer)
+	rampCmd.SetOut(buf)
+	rampCmd.SetErr(buf)
+
+	if err := rampCmd.RunE(rampCmd, []string{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := "Фокус сегодня: 48 мин (после сброса: 3 мин)"; !strings.Contains(buf.String(), want) {
+		t.Errorf("expected output to contain %q, got:\n%s", want, buf.String())
+	}
+}

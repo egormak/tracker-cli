@@ -3,6 +3,7 @@ package task
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
 	"strings"
@@ -490,6 +491,23 @@ func (t *TaskTimer) SetRestLimitActive(active bool) {
 	t.restLimitActive = active
 }
 
+// SetCompletionNotify controls whether a completed run fires the desktop
+// "task completed" notification. Callers that chain sprints and send their own
+// notification (evening combo) disable it to avoid overlapping banners.
+func (t *TaskTimer) SetCompletionNotify(enabled bool) {
+	t.skipCompletionNotify = !enabled
+}
+
+// Completed reports whether the last Run reached its full duration and was saved.
+func (t *TaskTimer) Completed() bool {
+	return t.completed
+}
+
+// DoneMinutes returns the time spent in the last Run, rounded to whole minutes.
+func (t *TaskTimer) DoneMinutes() int {
+	return int(math.Round(t.TimeDone))
+}
+
 func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 	if !t.started() {
 		slog.Info("task timer exited before start", "task", t.Name)
@@ -498,6 +516,7 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 
 	t.TimeEnd = t.TimeBegin.Add(elapsed)
 	t.TimeDone = elapsed.Minutes()
+	t.completed = completed
 
 	if completed {
 		notifyMessage := ""
@@ -530,7 +549,9 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 			telegram.TelegramMessageSend(msg)
 		}
 
-		notifier.NotifyTaskCompleted(t.Name, t.Role, int(t.TimeDone))
+		if !t.skipCompletionNotify {
+			notifier.NotifyTaskCompleted(t.Name, t.Role, t.DoneMinutes())
+		}
 	}
 
 	statistic.StatisticTaskShow(t.Name)

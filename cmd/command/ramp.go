@@ -52,7 +52,12 @@ func runRampStatus(cmd *cobra.Command) error {
 
 	cmd.Println("⚡️ Warm-Up Ramp Ladder (Линейный разгон)")
 	cmd.Printf("Текущий шаг:   %s\n", stepStr)
-	cmd.Printf("Фокус сегодня: %d мин\n", status.TodayFocusMinutes)
+	focusStr := fmt.Sprintf("%d мин", status.TodayFocusMinutes)
+	if status.ResetBaselineMinutes > 0 {
+		// After a manual reset the step follows the focus logged since the reset
+		focusStr += fmt.Sprintf(" (после сброса: %d мин)", status.EffectiveFocusMinutes)
+	}
+	cmd.Printf("Фокус сегодня: %s\n", focusStr)
 	cmd.Printf("Потолок:       %s\n", capStr)
 	cmd.Printf("Активно:       %s\n", activeStr)
 	cmd.Printf("Исключения:    %s\n", excludedStr)

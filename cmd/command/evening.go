@@ -69,30 +69,7 @@ var eveningCmd = &cobra.Command{
 				comboDuration = 10
 			}
 
-			for i, taskCandidate := range topCandidates {
-				cmd.Printf("⚡️ [Combo %d/%d] Starting sprint on '%s' (%d min)...\n", i+1, len(topCandidates), taskCandidate.TaskName, comboDuration)
-
-				taskTimer, err := task.CreateTaskTimerWithPercentFlag(taskCandidate.TaskName, comboDuration, 100, false)
-				if err != nil {
-					if errors.Is(err, task.ErrTaskCompleted) {
-						cmd.Printf("Task %s has no remaining time.\n", taskCandidate.TaskName)
-						continue
-					}
-					return err
-				}
-
-				if err := taskTimer.Run(); err != nil {
-					if errors.Is(err, task.ErrTaskAborted) {
-						return nil
-					}
-					return err
-				}
-
-				cmd.Printf("✅ Sprint on '%s' completed!\n", taskCandidate.TaskName)
-			}
-
-			cmd.Println("🎉 Evening Combo Chain completed successfully!")
-			return nil
+			return evening.RunCombo(cmd.OutOrStderr(), topCandidates, comboDuration)
 		}
 
 		if selectedTask == "" {

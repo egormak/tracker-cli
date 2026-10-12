@@ -9,10 +9,14 @@ type RampConfig struct {
 }
 
 type RampStatus struct {
-	CurrentStep       int        `json:"current_step"`
-	CapMinutes        int        `json:"cap_minutes"`
-	IsCapped          bool       `json:"is_capped"`
-	TodayFocusMinutes int        `json:"today_focus_minutes"`
-	Date              string     `json:"date"`
-	Config            RampConfig `json:"config"`
+	CurrentStep       int  `json:"current_step"`
+	CapMinutes        int  `json:"cap_minutes"`
+	IsCapped          bool `json:"is_capped"`
+	TodayFocusMinutes int  `json:"today_focus_minutes"`
+	// ResetBaselineMinutes is today's focus at the last manual reset (0 if none today);
+	// EffectiveFocusMinutes is the focus counted since then, which drives CurrentStep.
+	ResetBaselineMinutes  int        `json:"reset_baseline_minutes"`
+	EffectiveFocusMinutes int        `json:"effective_focus_minutes"`
+	Date                  string     `json:"date"`
+	Config                RampConfig `json:"config"`
 }
