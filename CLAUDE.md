@@ -83,6 +83,7 @@ The backend stores/returns rest time as integer "units" equal to `minutes * 100`
 - `tracker schedule adjust <task> <delta-min> [-d day]` / `schedule set <task> <target-min> [-d day]` / `schedule rollover` — edit this week's schedule targets or view rollover
 - `tracker ramp [status|reset|set-cap <minutes>]` — warm-up ramp ladder
 - `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`, `tracker tasklist`, `tracker statistic`
+- `tracker summary week [--previous] [--md]` — weekly digest from `GET /api/v1/stats/weekly/digest` (`internal/service/digest`); `tracker clean` prints it for the week it is about to wipe (`previous` on Monday) and cleans even if the digest fails
 - `tracker rest-spend -d MINUTES`, `tracker rest reset`
 - `tracker config [-n TASK -t MIN -p PRIORITY]` — with `-n`, sets that task's params; without it, `-t` sets the global scheduler time
 - `tracker timer-list-set -c COUNT`, `tracker role-recheck`, `tracker clean` — backend maintenance endpoints
