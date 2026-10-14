@@ -91,6 +91,7 @@ var eveningCmd = &cobra.Command{
 			return err
 		}
 
+		taskTimer.Origin = "evening"
 		if err := taskTimer.Run(); err != nil {
 			if errors.Is(err, task.ErrTaskAborted) {
 				return nil

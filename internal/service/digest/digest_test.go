@@ -106,3 +106,49 @@ func TestWeekBeforeClean(t *testing.T) {
 		t.Errorf("Sunday: expected %q, got %q", WeekCurrent, got)
 	}
 }
+
+func TestRenderClientsAndUsage(t *testing.T) {
+	d := sampleDigest()
+	d.Clients = []entity.WeeklyDigestClient{
+		{Client: "cli", Records: 4, Minutes: 240, SharePercent: 75},
+		{Client: "unknown", Records: 1, Minutes: 80, SharePercent: 25},
+	}
+	d.Usage = []entity.WeeklyDigestUsage{
+		{Event: "start_break_mood", Count: 3, Clients: []entity.WeeklyDigestUsageClient{{Client: "web", Count: 2}, {Client: "bot", Count: 1}}},
+		{Event: "future_event", Count: 1, Clients: []entity.WeeklyDigestUsageClient{{Client: "unknown", Count: 1}}},
+	}
+
+	out := Render(d, false)
+	for _, want := range []string{
+		"Клиенты:",
+		"cli: 4ч · 75% времени · записей 4",
+		"без метки: 1ч 20м · 25% времени · записей 1",
+		"Использование функций:",
+		"перерыв — по настроению: 3 (web 2, bot 1)",
+		"future_event: 1 (без метки 1)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plain output misses %q:\n%s", want, out)
+		}
+	}
+	if md := Render(d, true); !strings.Contains(md, "## Клиенты") || !strings.Contains(md, "- перерыв — по настроению: 3 (web 2, bot 1)") {
+		t.Errorf("markdown output misses the new sections:\n%s", md)
+	}
+}
+
+func TestRenderSnapshotAndUsageWithoutRecords(t *testing.T) {
+	d := entity.WeeklyDigest{
+		WeekStartDate:   "5 October 2026",
+		WeekEndDate:     "11 October 2026",
+		Source:          "snapshot",
+		SnapshotTakenAt: "not-a-time",
+		Usage:           []entity.WeeklyDigestUsage{{Event: "ramp_reset", Count: 2, Clients: []entity.WeeklyDigestUsageClient{{Client: "cli", Count: 2}}}},
+	}
+
+	out := Render(d, false)
+	for _, want := range []string{"Снимок перед очисткой (not-a-time).", "За эту неделю записей нет.", "сброс разгона: 2 (cli 2)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output misses %q:\n%s", want, out)
+		}
+	}
+}

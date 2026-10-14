@@ -17,17 +17,21 @@ type taskRecordResponse struct {
 	Data   entity.TaskRecord `json:"data"`
 }
 
-func StartRunningTask(name, role string, targetDuration int, sourceDay string) (entity.RunningTask, error) {
+// StartRunningTask starts a task on the server. origin says how the task was chosen
+// ("evening", "combo") for the weekly usage counters; "" is a manual start.
+func StartRunningTask(name, role string, targetDuration int, sourceDay, origin string) (entity.RunningTask, error) {
 	payload := struct {
 		TaskName       string `json:"task_name"`
 		Role           string `json:"role"`
 		TargetDuration int    `json:"target_duration"`
 		SourceDay      string `json:"source_day"`
+		Origin         string `json:"origin,omitempty"`
 	}{
 		TaskName:       name,
 		Role:           role,
 		TargetDuration: targetDuration,
 		SourceDay:      sourceDay,
+		Origin:         origin,
 	}
 
 	jsonData, err := json.Marshal(payload)

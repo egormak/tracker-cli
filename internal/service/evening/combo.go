@@ -30,6 +30,7 @@ var (
 		}
 		// RunCombo sends one notification per transition itself.
 		taskTimer.SetCompletionNotify(false)
+		taskTimer.Origin = "combo"
 
 		return comboSprint{
 			role:     taskTimer.Role,

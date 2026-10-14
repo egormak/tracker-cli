@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"tracker_cli/internal/repository/api"
 
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	api.InstallClientHeader()
 	if err := rootCmd.Execute(); err != nil {
 		slog.Error("error in command", "error", err)
 		os.Exit(1)

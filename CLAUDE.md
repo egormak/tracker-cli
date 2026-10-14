@@ -26,6 +26,7 @@ Pushing a git tag triggers `.github/workflows/github-actions-demo.yml`, which bu
 
 Tests never hit a live backend. Two seams are used:
 - **Package-level function variables** that tests swap and restore — e.g. `percentTaskSelector`, `percentTimerRunner`, `telegramSender` in `internal/service/plan/percent.go`, `backlogTimerRunner` in `backlog.go`. Follow this pattern when adding logic that loops over timer runs.
+- **`api.InstallClientHeader()`** (`internal/repository/api/client_header.go`, called from `command.Execute`) wraps `http.DefaultTransport` so every request to `config.TrackerDomain` carries `X-Tracker-Client: cli` — through the default transport because of the inline `http.Client`s below. A transport set with `SetClientTransport` replaces it, so tests see no header. `TaskTimer.Origin` (`"evening"`, `"combo"`) is sent as `origin` on start for the server's weekly usage counters.
 - **`api.SetClientTransport(rt)`** in `internal/repository/api/api.go` replaces the shared `http.Client`'s transport with a fake `RoundTripper` (returns a cleanup func). This only affects calls that go through `sendRequest` — packages with their own inline `http.Client` (see below) can't be faked this way.
 
 ### Backend

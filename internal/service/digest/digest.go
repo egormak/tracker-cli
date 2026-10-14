@@ -67,8 +67,12 @@ func Render(d entity.WeeklyDigest, markdown bool) string {
 	}
 
 	title(fmt.Sprintf("Итоги недели: %s — %s", d.WeekStartDate, d.WeekEndDate))
+	if d.Source == "snapshot" {
+		fmt.Fprintf(&b, "Снимок перед очисткой (%s).\n", snapshotTime(d.SnapshotTakenAt))
+	}
 	if d.TotalDone == 0 {
 		b.WriteString("За эту неделю записей нет.\n")
+		usageSection(d, section, item)
 		return b.String()
 	}
 	fmt.Fprintf(&b, "Всего: %s из %s по плану (%d%%)\n",
@@ -115,5 +119,62 @@ func Render(d entity.WeeklyDigest, markdown bool) string {
 		item("%s: %s%s", day.Day, minutes(day.TotalDone), mark)
 	}
 
+	if len(d.Clients) > 0 {
+		section("Клиенты")
+		for _, c := range d.Clients {
+			item("%s: %s · %d%% времени · записей %d", clientLabel(c.Client), minutes(c.Minutes), c.SharePercent, c.Records)
+		}
+	}
+	usageSection(d, section, item)
+
 	return b.String()
+}
+
+// usageSection lists the week's choice counters with the per-client split.
+func usageSection(d entity.WeeklyDigest, section func(string), item func(string, ...any)) {
+	if len(d.Usage) == 0 {
+		return
+	}
+	section("Использование функций")
+	for _, u := range d.Usage {
+		parts := make([]string, 0, len(u.Clients))
+		for _, c := range u.Clients {
+			parts = append(parts, fmt.Sprintf("%s %d", clientLabel(c.Client), c.Count))
+		}
+		item("%s: %d (%s)", usageLabel(u.Event), u.Count, strings.Join(parts, ", "))
+	}
+}
+
+var usageLabels = map[string]string{
+	"start_manual":        "запуск вручную",
+	"start_break_variety": "перерыв — отстающая задача",
+	"start_break_mood":    "перерыв — по настроению",
+	"start_evening":       "запуск из вечернего режима",
+	"start_combo":         "шаг комбо",
+	"evening_skip":        "пропуск в вечернем режиме",
+	"ramp_reset":          "сброс разгона",
+	"timer_extend":        "продление таймера",
+}
+
+// usageLabel falls back to the raw event name for events a newer server may add.
+func usageLabel(event string) string {
+	if label, ok := usageLabels[event]; ok {
+		return label
+	}
+	return event
+}
+
+func clientLabel(client string) string {
+	if client == "unknown" {
+		return "без метки"
+	}
+	return client
+}
+
+func snapshotTime(takenAt string) string {
+	t, err := time.Parse(time.RFC3339, takenAt)
+	if err != nil {
+		return takenAt
+	}
+	return t.Local().Format("2 January 2006 15:04")
 }

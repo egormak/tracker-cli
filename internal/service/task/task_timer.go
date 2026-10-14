@@ -412,7 +412,7 @@ func formatDuration(d time.Duration) string {
 
 func (t *TaskTimer) Run() error {
 	// Call server to start the running task
-	runningTask, err := api.StartRunningTask(t.Name, t.Role, t.TimeDuration, t.SourceDay)
+	runningTask, err := api.StartRunningTask(t.Name, t.Role, t.TimeDuration, t.SourceDay, t.Origin)
 	if err != nil {
 		return fmt.Errorf("failed to start task on server: %w", err)
 	}
