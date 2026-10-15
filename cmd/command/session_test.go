@@ -27,12 +27,8 @@ func TestSessionCommand_Configuration(t *testing.T) {
 		t.Fatal("expected sessionCmd to have 'delay' flag")
 	}
 
-	restLimitFlag := sessionCmd.Flags().Lookup("rest-limit")
-	if restLimitFlag == nil {
-		t.Fatal("expected sessionCmd to have 'rest-limit' flag")
-	}
-	if restLimitFlag.Shorthand != "r" {
-		t.Errorf("expected rest-limit shorthand 'r', got %q", restLimitFlag.Shorthand)
+	if sessionCmd.Flags().Lookup("rest-limit") != nil {
+		t.Error("the rest balance is gone; sessionCmd must not have a 'rest-limit' flag")
 	}
 }
 
@@ -56,13 +52,11 @@ func TestPlanBacklogCommand_BatchFlag(t *testing.T) {
 	}
 }
 
-func TestRestResetCommand_Configuration(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"rest", "reset"})
-	if err != nil {
-		t.Fatalf("failed to find 'rest reset' command: %v", err)
-	}
-	if cmd.Name() != "reset" {
-		t.Errorf("expected command name 'reset', got %q", cmd.Name())
+func TestNoRestCommands(t *testing.T) {
+	for _, c := range rootCmd.Commands() {
+		if c.Name() == "rest" || c.Name() == "rest-spend" {
+			t.Errorf("the rest balance is gone; unexpected command %q", c.Name())
+		}
 	}
 }
 

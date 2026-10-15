@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"tracker_cli/internal/domain/entity"
-	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service/task"
 )
@@ -20,7 +19,7 @@ var (
 	backlogRolloversGetter = api.GetRolloverTasks
 	backlogDurationGetter  = api.TimeDurationGet
 
-	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int, restLimitActive bool) (int, error) {
+	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int) (int, error) {
 		timerObj, err := task.CreateTaskTimerWithSourceDay(rollover.TaskName, duration, rollover.Percent, rollover.SourceDay)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
@@ -31,7 +30,6 @@ var (
 		}
 
 		timerObj.SourceDay = rollover.SourceDay
-		timerObj.SetRestLimitActive(restLimitActive)
 
 		slog.Info("starting backlog task", "task", rollover.TaskName, "duration", duration)
 
@@ -56,21 +54,17 @@ var (
 	}
 )
 
-// RunBacklog triggers the gamified / backlog sequence.
-func RunBacklog(delay time.Duration, restLimitMinutes int, batchDuration ...time.Duration) error {
-	var batch time.Duration
-	if len(batchDuration) > 0 {
-		batch = batchDuration[0]
-	}
-	return runBacklogInternal(delay, restLimitMinutes, batch)
+// RunBacklog works through the rollover/backlog tasks until none is left.
+func RunBacklog(delay time.Duration) error {
+	return runBacklogInternal(delay, 0)
 }
 
-// RunBacklogBatch triggers the gamified / backlog sequence for a target batch duration.
-func RunBacklogBatch(delay time.Duration, restLimitMinutes int, batchDuration time.Duration) error {
-	return runBacklogInternal(delay, restLimitMinutes, batchDuration)
+// RunBacklogBatch works through the rollover/backlog tasks until batchDuration is used up.
+func RunBacklogBatch(delay time.Duration, batchDuration time.Duration) error {
+	return runBacklogInternal(delay, batchDuration)
 }
 
-func runBacklogInternal(delay time.Duration, restLimitMinutes int, batchDuration time.Duration) error {
+func runBacklogInternal(delay time.Duration, batchDuration time.Duration) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -120,24 +114,7 @@ func runBacklogInternal(delay time.Duration, restLimitMinutes int, batchDuration
 					continue
 				}
 
-				if restLimitMinutes >= 0 {
-					limitUnits := restutil.UnitsFromMinutes(restLimitMinutes)
-					restUnits, err := restBalanceGetter()
-					if err != nil {
-						return fmt.Errorf("fetch rest balance: %w", err)
-					}
-
-					currentMinutes := restutil.MinutesFromUnits(restUnits)
-					if restUnits > limitUnits {
-						slog.Info("rest limit reached", "rest_minutes", currentMinutes, "limit_minutes", restLimitMinutes)
-						telegramSender(fmt.Sprintf("Rest limit reached: %.1f minutes available (limit %d). Take a break or do some exercise.", currentMinutes, restLimitMinutes))
-						return nil
-					}
-				}
-
-				restLimitActive := restLimitMinutes >= 0
-
-				actualTaskDone, err := runBacklogOnce(ctx, delay, restLimitActive, rollover, remainingBatch)
+				actualTaskDone, err := runBacklogOnce(ctx, delay, rollover, remainingBatch)
 				if err != nil {
 					if errors.Is(err, task.ErrTaskAborted) {
 						return nil
@@ -199,24 +176,7 @@ func runBacklogInternal(delay time.Duration, restLimitMinutes int, batchDuration
 				continue
 			}
 
-			if restLimitMinutes >= 0 {
-				limitUnits := restutil.UnitsFromMinutes(restLimitMinutes)
-				restUnits, err := restBalanceGetter()
-				if err != nil {
-					return fmt.Errorf("fetch rest balance: %w", err)
-				}
-
-				currentMinutes := restutil.MinutesFromUnits(restUnits)
-				if restUnits > limitUnits {
-					slog.Info("rest limit reached", "rest_minutes", currentMinutes, "limit_minutes", restLimitMinutes)
-					telegramSender(fmt.Sprintf("Rest limit reached: %.1f minutes available (limit %d). Take a break or do some exercise.", currentMinutes, restLimitMinutes))
-					return nil
-				}
-			}
-
-			restLimitActive := restLimitMinutes >= 0
-
-			if _, err := runBacklogOnce(ctx, delay, restLimitActive, rollover); err != nil {
+			if _, err := runBacklogOnce(ctx, delay, rollover); err != nil {
 				if errors.Is(err, task.ErrTaskAborted) {
 					return nil
 				}
@@ -236,7 +196,7 @@ func runBacklogInternal(delay time.Duration, restLimitMinutes int, batchDuration
 	return nil
 }
 
-func runBacklogOnce(ctx context.Context, delay time.Duration, restLimitActive bool, rollover entity.RolloverTask, maxDuration ...int) (int, error) {
+func runBacklogOnce(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, maxDuration ...int) (int, error) {
 	if delay < 0 {
 		delay = 0
 	}
@@ -263,5 +223,5 @@ func runBacklogOnce(ctx context.Context, delay time.Duration, restLimitActive bo
 
 	slog.Info("backlog task selected", "task", rollover.TaskName, "source_day", rollover.SourceDay, "duration", timeDuration, "remaining", rollover.RemainingTime)
 
-	return backlogTimerRunner(ctx, delay, rollover, timeDuration, restLimitActive)
+	return backlogTimerRunner(ctx, delay, rollover, timeDuration)
 }

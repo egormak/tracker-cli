@@ -4,6 +4,11 @@ info:
   description: |
     API for time tracking with three main roles: Work, Learn, and Rest.
     This service helps track time spent on various tasks and manage schedules.
+
+    NOTE: this is a stale, partial copy kept for quick reference. The authoritative
+    contract is `tracker-server/openapi.yml` (e.g. `GET /api/v1/debt`, the running-task
+    endpoints with `debt_share`/`split`, ramp, evening focus are only documented there).
+    The rest balance endpoints (`/api/v1/rest/*`, `/rest-get`, `/rest-spend`) were removed.
   version: 1.0.0
 servers:
   - url: http://localhost:8080
@@ -15,8 +20,6 @@ tags:
     description: Task management operations
   - name: TaskRecord
     description: Task record operations
-  - name: Rest
-    description: Rest time management
   - name: Statistics
     description: Statistical information
   - name: Role
@@ -330,93 +333,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/rest/add:
-    post:
-      tags:
-        - Rest
-      summary: Add rest time
-      description: Add rest time to the account
-      operationId: addRest
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RestRecordRequest"
-      responses:
-        '200':
-          description: Rest time added successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/rest/spend:
-    post:
-      tags:
-        - Rest
-      summary: Spend rest time
-      description: Spend rest time from the account
-      operationId: spendRest
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RestRecordRequest"
-      responses:
-        '200':
-          description: Rest time spent successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/rest/get:
-    get:
-      tags:
-        - Rest
-      summary: Get rest time
-      description: Get available rest time
-      operationId: getRest
-      responses:
-        '200':
-          description: Rest time retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RestTimeResponse"
         '500':
           description: Internal server error
           content:
@@ -1186,54 +1102,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /api/v1/rest-get:
-    get:
-      deprecated: true
-      tags:
-        - Rest
-      summary: Get rest time (legacy)
-      operationId: getRestLegacy
-      responses:
-        '200':
-          description: Rest time retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RestTimeResponse"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/rest-spend:
-    post:
-      deprecated: true
-      tags:
-        - Rest
-      summary: Spend rest time (legacy)
-      operationId: spendRestLegacy
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RestRecordRequest"
-      responses:
-        '200':
-          description: Rest time spent successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   /api/v1/manage/plan-percents:
     get:
       tags:
@@ -1687,28 +1555,6 @@ components:
         task_name: "Programming"
         percent: 80
         time_left: 24
-
-    RestRecordRequest:
-      type: object
-      properties:
-        rest_time:
-          type: integer
-          description: Rest time in minutes
-      required:
-        - rest_time
-      example:
-        rest_time: 15
-
-    RestTimeResponse:
-      type: object
-      properties:
-        rest_time:
-          type: integer
-          description: Available rest time in minutes
-      required:
-        - rest_time
-      example:
-        rest_time: 45
 
     CreateTaskRequest:
       type: object

@@ -30,7 +30,7 @@ func TestGetRampStatus(t *testing.T) {
 							"enabled_roles": ["work", "learn"],
 							"enabled_tasks": ["home_task"],
 							"excluded_tasks": ["video", "movies", "games", "telegram"],
-							"default_rest_fallback": 15
+							"default_fallback_minutes": 15
 						}
 					}`)),
 					Header: make(http.Header),
@@ -53,7 +53,7 @@ func TestGetRampStatus(t *testing.T) {
 		if status.CurrentStep != 3 || status.CapMinutes != 25 || status.TodayFocusMinutes != 6 {
 			t.Errorf("unexpected status parsed: %+v", status)
 		}
-		if len(status.Config.EnabledRoles) != 2 || status.Config.DefaultRestFallback != 15 {
+		if len(status.Config.EnabledRoles) != 2 || status.Config.DefaultFallbackMinutes != 15 {
 			t.Errorf("unexpected config inside status: %+v", status.Config)
 		}
 	})
@@ -96,7 +96,7 @@ func TestResetRamp(t *testing.T) {
 							"enabled_roles": ["work", "learn"],
 							"enabled_tasks": ["home_task"],
 							"excluded_tasks": ["video"],
-							"default_rest_fallback": 15
+							"default_fallback_minutes": 15
 						}
 					}`)),
 					Header: make(http.Header),
@@ -158,7 +158,7 @@ func TestAdvanceRamp(t *testing.T) {
 						"enabled_roles": ["work"],
 						"enabled_tasks": [],
 						"excluded_tasks": [],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),
@@ -198,7 +198,7 @@ func TestGetRampConfig(t *testing.T) {
 					"enabled_roles": ["work", "learn"],
 					"enabled_tasks": ["home_task"],
 					"excluded_tasks": ["video", "movies"],
-					"default_rest_fallback": 12
+					"default_fallback_minutes": 12
 				}`)),
 				Header: make(http.Header),
 			}, nil
@@ -217,7 +217,7 @@ func TestGetRampConfig(t *testing.T) {
 	if !called {
 		t.Error("expected GET /api/v1/ramp/config to be called")
 	}
-	if cfg.CapMinutes != 20 || cfg.DefaultRestFallback != 12 {
+	if cfg.CapMinutes != 20 || cfg.DefaultFallbackMinutes != 12 {
 		t.Errorf("unexpected config: %+v", cfg)
 	}
 }
@@ -243,7 +243,7 @@ func TestUpdateRampConfig(t *testing.T) {
 						"enabled_roles": ["work", "learn"],
 						"enabled_tasks": ["home_task"],
 						"excluded_tasks": ["video"],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),
@@ -257,11 +257,11 @@ func TestUpdateRampConfig(t *testing.T) {
 	})
 
 	cfg := entity.RampConfig{
-		CapMinutes:          30,
-		EnabledRoles:        []string{"work", "learn"},
-		EnabledTasks:        []string{"home_task"},
-		ExcludedTasks:       []string{"video"},
-		DefaultRestFallback: 15,
+		CapMinutes:             30,
+		EnabledRoles:           []string{"work", "learn"},
+		EnabledTasks:           []string{"home_task"},
+		ExcludedTasks:          []string{"video"},
+		DefaultFallbackMinutes: 15,
 	}
 
 	status, err := UpdateRampConfig(cfg)

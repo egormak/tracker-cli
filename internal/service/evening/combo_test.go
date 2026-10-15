@@ -20,6 +20,8 @@ type fakeSprint struct {
 }
 
 // fakeCombo swaps the combo seams and returns the recorded notifications and started sprints.
+var lastOptions = &chainOptions{}
+
 func fakeCombo(t *testing.T, sprints map[string]fakeSprint) (notifications *[]string, started *[]string) {
 	t.Helper()
 
@@ -31,7 +33,8 @@ func fakeCombo(t *testing.T, sprints map[string]fakeSprint) (notifications *[]st
 	notifications = &[]string{}
 	started = &[]string{}
 
-	comboSprintCreator = func(name string, duration int) (comboSprint, error) {
+	comboSprintCreator = func(name string, duration int, opts chainOptions) (comboSprint, error) {
+		*lastOptions = opts
 		fake, ok := sprints[name]
 		if !ok {
 			t.Fatalf("unexpected sprint creation for %q", name)
@@ -175,5 +178,48 @@ func TestRunCombo(t *testing.T) {
 				t.Errorf("chain finished message present = %v, want %v\noutput:\n%s", got, tc.wantChainFinished, out.String())
 			}
 		})
+	}
+}
+
+func TestBuildBatch(t *testing.T) {
+	cands := comboCandidates("games", "home_task", "telegram", "video", "movies")
+	names := func(cs []entity.EveningFocusCandidate) []string {
+		out := make([]string, len(cs))
+		for i, c := range cs {
+			out[i] = c.TaskName
+		}
+		return out
+	}
+	cases := []struct {
+		anchor string
+		n      int
+		want   []string
+	}{
+		{"", 3, []string{"games", "home_task", "telegram"}},
+		{"telegram", 3, []string{"telegram", "games", "home_task"}},
+		{"Home_Task", 4, []string{"home_task", "games", "telegram", "video"}},
+		{"reading", 3, []string{"reading", "games", "home_task"}}, // anchor outside the candidates
+	}
+	for _, c := range cases {
+		if got := names(BuildBatch(cands, c.anchor, c.n)); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("BuildBatch(%q, %d) = %v, want %v", c.anchor, c.n, got, c.want)
+		}
+	}
+}
+
+func TestRunBatchSendsOriginAndDebtShare(t *testing.T) {
+	_, started := fakeCombo(t, map[string]fakeSprint{"games": {completed: true}, "video": {completed: true}})
+	var out bytes.Buffer
+	if err := RunBatch(&out, comboCandidates("games", "video"), 15, 25); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(*started, []string{"games", "video"}) {
+		t.Errorf("started %v", *started)
+	}
+	if lastOptions.origin != "batch" || lastOptions.debtShare != 25 {
+		t.Errorf("expected origin batch and share 25, got %+v", *lastOptions)
+	}
+	if !strings.Contains(out.String(), "[Батч 1/2]") || !strings.Contains(out.String(), "Батч завершён") {
+		t.Errorf("unexpected output:\n%s", out.String())
 	}
 }

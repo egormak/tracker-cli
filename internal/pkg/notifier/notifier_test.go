@@ -3,7 +3,6 @@ package notifier
 import (
 	"bytes"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -199,19 +198,5 @@ func TestNotifyComboStep(t *testing.T) {
 	want := `display notification "Step 2/3: Starting 'Review \"PRs\"' (15 min). Let's go!" with title "⚡ Tracker — Evening Combo Advance" sound name "Submarine"`
 	if got := darwinScript(t, *commands); got != want {
 		t.Errorf("script mismatch\n got: %s\nwant: %s", got, want)
-	}
-}
-
-func TestNotifyRestBalance(t *testing.T) {
-	commands, _ := fakeNotifier(t, "darwin")
-
-	NotifyRestBalance(15.5)
-
-	script := darwinScript(t, *commands)
-	if !strings.Contains(script, "You have 15.5 minutes of rest banked.") {
-		t.Errorf("rest balance missing from script: %s", script)
-	}
-	if !strings.HasSuffix(script, `sound name "Glass"`) {
-		t.Errorf("expected default sound, got: %s", script)
 	}
 }

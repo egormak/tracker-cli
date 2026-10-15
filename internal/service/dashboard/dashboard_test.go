@@ -49,7 +49,7 @@ func TestDashboardModel_DataLoadedMsg(t *testing.T) {
 			{Name: "work", Role: "work", TimeDuration: 240, TimeDone: 60, Priority: 1},
 			{Name: "english", Role: "learn", TimeDuration: 20, TimeDone: 0, Priority: 2},
 		},
-		restUnits:     1500, // 15.0 min
+		debt:          entity.DebtSummary{TotalMinutes: 36},
 		scheduledTime: 260,
 		completedTime: 60,
 	}
@@ -66,7 +66,7 @@ func TestDashboardModel_DataLoadedMsg(t *testing.T) {
 	if len(dm.taskList) != 2 {
 		t.Errorf("expected 2 tasks, got %d", len(dm.taskList))
 	}
-	if dm.restUnits != 1500 {
-		t.Errorf("expected rest units 1500, got %d", dm.restUnits)
+	if dm.debt.TotalMinutes != 36 {
+		t.Errorf("expected debt 36, got %d", dm.debt.TotalMinutes)
 	}
 }

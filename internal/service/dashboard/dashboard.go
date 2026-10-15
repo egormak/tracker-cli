@@ -12,8 +12,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"tracker_cli/internal/domain/entity"
-	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
+	"tracker_cli/internal/service/debt"
 	"tracker_cli/internal/service/task"
 	"tracker_cli/internal/ui/theme"
 )
@@ -33,7 +33,7 @@ type DashboardModel struct {
 	taskList      []entity.TaskList
 	rolloverTasks []entity.RolloverTask
 	eveningFocus  entity.EveningFocusResponse
-	restUnits     int
+	debt          entity.DebtSummary
 	scheduledTime int
 	completedTime int
 	ramp          entity.RampStatus
@@ -53,7 +53,7 @@ type dataLoadedMsg struct {
 	taskList      []entity.TaskList
 	rolloverTasks []entity.RolloverTask
 	eveningFocus  entity.EveningFocusResponse
-	restUnits     int
+	debt          entity.DebtSummary
 	scheduledTime int
 	completedTime int
 	ramp          entity.RampStatus
@@ -84,10 +84,9 @@ func fetchDashboardDataCmd() tea.Cmd {
 			msg.rolloverTasks = ro
 		}
 
-		// 4. Rest Units
-		ru, err := api.GetRestTime()
-		if err == nil {
-			msg.restUnits = ru
+		// 4. Debt (previous days' unfinished schedule)
+		if d, err := api.GetDebt(); err == nil {
+			msg.debt = d
 		}
 
 		// 5. Scheduled & Completed Time
@@ -172,7 +171,7 @@ func (m DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runningTask = msg.runningTask
 		m.taskList = msg.taskList
 		m.rolloverTasks = msg.rolloverTasks
-		m.restUnits = msg.restUnits
+		m.debt = msg.debt
 		m.scheduledTime = msg.scheduledTime
 		m.completedTime = msg.completedTime
 		m.eveningFocus = msg.eveningFocus
@@ -425,17 +424,15 @@ func (m DashboardModel) renderAnalyticsTab() string {
 	}
 
 	progressBar := theme.RenderProgressBar(40, ratio, theme.ColorWork)
-	restMinutes := restutil.MinutesFromUnits(m.restUnits)
-
 	stats := fmt.Sprintf(
-		"Daily Target: %d min\nCompleted:    %d min (%1.0f%%)\n\n[%s]\n\nRest Pool Balance: %.1f min (Time to relax or exercise!)\n",
-		scheduled, completed, percent, progressBar, restMinutes,
+		"Daily Target: %d min\nCompleted:    %d min (%1.0f%%)\n\n[%s]\n\n%s\n%s\n",
+		scheduled, completed, percent, progressBar, debt.Line(m.debt), debt.WeekStrip(m.debt),
 	)
 
 	return theme.CardStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Left,
-			theme.TitleStyle.Render("📊 DAILY PROGRESS & REST BALANCE"),
+			theme.TitleStyle.Render("📊 DAILY PROGRESS & DEBT"),
 			stats,
 		),
 	)
@@ -478,7 +475,8 @@ func (m DashboardModel) renderFooter() string {
 		rampInfo = fmt.Sprintf("⚡️ Ramp: %dm (Cap %dm) [r: reset]  •  ", m.ramp.CurrentStep, m.ramp.CapMinutes)
 	}
 
-	help := theme.SubTitleStyle.Render(fmt.Sprintf("%s[Tab/1-4] Switch View • [r] Reset Ramp • [q] Quit", rampInfo))
+	debtInfo := debt.Line(m.debt) + "  •  "
+	help := theme.SubTitleStyle.Render(fmt.Sprintf("%s%s[Tab/1-4] Switch View • [r] Reset Ramp • [q] Quit", debtInfo, rampInfo))
 	if status != "" {
 		return lipgloss.JoinVertical(lipgloss.Left, "", lipgloss.NewStyle().Foreground(theme.ColorWarning).Render(status), help)
 	}

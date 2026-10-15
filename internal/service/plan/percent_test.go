@@ -28,7 +28,7 @@ func TestRunPercentBatch_ClampingAndProgress(t *testing.T) {
 		return "test-task", 50, 25, "", nil
 	}
 
-	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string, restLimitActive bool) (int, error) {
+	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string) (int, error) {
 		executed = append(executed, executedTask{name: name, duration: duration})
 		return duration, nil
 	}
@@ -41,7 +41,7 @@ func TestRunPercentBatch_ClampingAndProgress(t *testing.T) {
 	// 40 minute batch:
 	// Step 1: requested 25m, remaining 40m -> run 25m, elapsed becomes 25m
 	// Step 2: requested 25m, remaining 15m -> clamped to 15m, run 15m, elapsed becomes 40m
-	err := RunPercentBatch(0, -1, 40*time.Minute, false)
+	err := RunPercentBatch(0, 40*time.Minute, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -65,7 +65,7 @@ func TestRunPercentBatch_ClampingAndProgress(t *testing.T) {
 }
 
 func TestRunPercentBatch_DurationValidation(t *testing.T) {
-	err := RunPercentBatch(0, -1, 30*time.Second, false)
+	err := RunPercentBatch(0, 30*time.Second, false)
 	if err == nil {
 		t.Fatal("expected error for batch duration < 1m, got nil")
 	}
@@ -83,11 +83,11 @@ func TestRunPercentBatch_Abort(t *testing.T) {
 		return "aborted-task", 50, 25, "", nil
 	}
 
-	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string, restLimitActive bool) (int, error) {
+	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string) (int, error) {
 		return 5, task.ErrTaskAborted
 	}
 
-	err := RunPercentBatch(0, -1, 30*time.Minute, false)
+	err := RunPercentBatch(0, 30*time.Minute, false)
 	if err != nil {
 		t.Fatalf("expected nil error on abort, got %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRunPercentBatch_RotateOnCompletedTask(t *testing.T) {
 		return "next-task", 50, 20, "", nil
 	}
 
-	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string, restLimitActive bool) (int, error) {
+	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string) (int, error) {
 		if name == "completed-task" {
 			return 0, task.ErrTaskCompleted
 		}
@@ -125,7 +125,7 @@ func TestRunPercentBatch_RotateOnCompletedTask(t *testing.T) {
 		return "rotated", nil
 	}
 
-	err := RunPercentBatch(0, -1, 20*time.Minute, false)
+	err := RunPercentBatch(0, 20*time.Minute, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -148,12 +148,12 @@ func TestRunPercentBatch_EarlyQuitNoOverCredit(t *testing.T) {
 	}
 
 	// User quit early: only 2 minutes credited, not full 25!
-	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string, restLimitActive bool) (int, error) {
+	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string) (int, error) {
 		return 2, nil
 	}
 
 	// For a 5m batch, step 1 did 2m, step 2 did 2m, step 3 clamped to 1m -> 5m
-	err := RunPercentBatch(0, -1, 4*time.Minute, false)
+	err := RunPercentBatch(0, 4*time.Minute, false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

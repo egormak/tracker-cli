@@ -8,13 +8,13 @@ type EveningFocusCandidate struct {
 	WeeklyGap    int    `json:"weekly_gap"`
 	Priority     int    `json:"priority"`
 	IsStrict     bool   `json:"is_strict"`
+	DebtToDate   int    `json:"debt_to_date"` // previous days' debt + today's remainder; the server ranks by it
 }
 
 type EveningFocusResponse struct {
 	CurrentTask EveningFocusCandidate   `json:"current_task"`
 	Candidates  []EveningFocusCandidate `json:"candidates"`
 	SprintTime  int                     `json:"sprint_time"`
-	RestPool    int                     `json:"rest_pool"`
 }
 
 type EveningFocusAPIResponse struct {

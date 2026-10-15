@@ -223,11 +223,10 @@ func TestViewRendering(t *testing.T) {
 			sprintTime: 20,
 			focus: entity.EveningFocusResponse{
 				Candidates: []entity.EveningFocusCandidate{
-					{TaskName: "alpha-task", Role: "work", WeeklyDone: 60, WeeklyTarget: 100, WeeklyGap: 40},
+					{TaskName: "alpha-task", Role: "work", WeeklyDone: 60, WeeklyTarget: 100, WeeklyGap: 40, DebtToDate: 25},
 					{TaskName: "beta-task", Role: "learn", WeeklyDone: 20, WeeklyTarget: 50, WeeklyGap: 30},
 					{TaskName: "gamma-task", Role: "rest", WeeklyDone: 30, WeeklyTarget: 60, WeeklyGap: 30},
 				},
-				RestPool: 15,
 			},
 			selectedIndex: 0,
 		}
@@ -249,9 +248,9 @@ func TestViewRendering(t *testing.T) {
 			t.Errorf("expected view to contain cursor ❯, got:\n%s", view)
 		}
 
-		// Verify deficit
-		if !strings.Contains(view, "deficit: 40m") {
-			t.Errorf("expected view to contain 'deficit: 40m', got:\n%s", view)
+		// Verify debt to date and the weekly gap
+		if !strings.Contains(view, "долг 25m · неделя −40m") {
+			t.Errorf("expected view to contain the debt to date and the weekly gap, got:\n%s", view)
 		}
 
 		// Verify duration selector

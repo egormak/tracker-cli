@@ -17,27 +17,21 @@ var planBacklogCmd = &cobra.Command{
 			return err
 		}
 
-		restLimit, err := cmd.Flags().GetInt("rest-limit")
-		if err != nil {
-			return err
-		}
-
 		batch, err := cmd.Flags().GetDuration("batch")
 		if err != nil {
 			return err
 		}
 
 		if batch > 0 {
-			return plan.RunBacklogBatch(delay, restLimit, batch)
+			return plan.RunBacklogBatch(delay, batch)
 		}
 
-		return plan.RunBacklog(delay, restLimit)
+		return plan.RunBacklog(delay)
 	},
 }
 
 func init() {
 	planBacklogCmd.Flags().Duration("delay", 15*time.Second, "Delay before starting the task timer")
-	planBacklogCmd.Flags().IntP("rest-limit", "r", -1, "Maximum rest minutes before stopping; negative disables continuous mode")
-	planBacklogCmd.Flags().DurationP("batch", "b", 0, "Batch duration (e.g. 30m, 45m, 1h); runs tasks until batch time is reached")
+	planBacklogCmd.Flags().DurationP("batch", "b", 0, "Batch duration (e.g. 30m, 45m, 1h); stops when it is used up. Without it, runs until no backlog is left")
 	planCmd.AddCommand(planBacklogCmd)
 }

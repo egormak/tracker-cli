@@ -246,7 +246,7 @@ func (m model) View() string {
 		}
 
 		line1 := fmt.Sprintf("%s%s %s%s", cursor, rank, taskName, roleTag)
-		line2 := fmt.Sprintf("   %s %d/%dm (deficit: %dm)", bar, cand.WeeklyDone, cand.WeeklyTarget, gap)
+		line2 := fmt.Sprintf("   %s %d/%dm долг %dm · неделя −%dm", bar, cand.WeeklyDone, cand.WeeklyTarget, cand.DebtToDate, gap)
 
 		b.WriteString(style.Render(line1+"\n"+line2) + "\n")
 	}
@@ -270,9 +270,6 @@ func (m model) View() string {
 		}
 	}
 	durLine := fmt.Sprintf("⏱️ Duration: %s (or toggle with 't')", strings.Join(durItems, "  "))
-	if m.focus.RestPool > 0 {
-		durLine += fmt.Sprintf("  |  Rest Pool: %d min", m.focus.RestPool)
-	}
 	b.WriteString("\n" + durLine + "\n")
 
 	// Keymap instructions

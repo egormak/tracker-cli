@@ -43,6 +43,11 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read previous-days flag: %w", err)
 	}
 
+	debtShare, _ := cmd.Flags().GetInt("debt")
+	if debtShare < 0 || debtShare > 100 {
+		return fmt.Errorf("--debt must be between 0 and 100, got %d", debtShare)
+	}
+
 	percentSpecified := cmd.Flags().Changed("percent")
 
 	// If previous-days flag is set, use schedule-aware task retrieval
@@ -63,6 +68,7 @@ func TaskRun(cmd *cobra.Command, args []string) error {
 	if sourceDay != "" {
 		taskApp.SourceDay = sourceDay
 	}
+	taskApp.DebtShare = debtShare
 
 	if err := taskApp.Run(); err != nil {
 		if errors.Is(err, ErrTaskAborted) {
@@ -116,7 +122,7 @@ func GetRampDurationForTask(taskName, role string) (duration int, isRamp bool, r
 	// 1. Excluded tasks check (highest precedence)
 	for _, excluded := range cfg.ExcludedTasks {
 		if strings.EqualFold(taskName, excluded) || (role != "" && strings.EqualFold(role, excluded)) {
-			fallback := cfg.DefaultRestFallback
+			fallback := cfg.DefaultFallbackMinutes
 			if fallback <= 0 {
 				fallback = 15
 			}
@@ -147,7 +153,7 @@ func GetRampDurationForTask(taskName, role string) (duration int, isRamp bool, r
 	}
 
 	// 4. Fallback for non-eligible tasks / rest
-	fallback := cfg.DefaultRestFallback
+	fallback := cfg.DefaultFallbackMinutes
 	if fallback <= 0 {
 		fallback = 15
 	}

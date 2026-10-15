@@ -18,20 +18,23 @@ type taskRecordResponse struct {
 }
 
 // StartRunningTask starts a task on the server. origin says how the task was chosen
-// ("evening", "combo") for the weekly usage counters; "" is a manual start.
-func StartRunningTask(name, role string, targetDuration int, sourceDay, origin string) (entity.RunningTask, error) {
+// ("evening", "combo", "batch") for the weekly usage counters; "" is a manual start.
+// debtShare (0–100) is the percent of the session that pays the task's past debt on stop.
+func StartRunningTask(name, role string, targetDuration int, sourceDay, origin string, debtShare int) (entity.RunningTask, error) {
 	payload := struct {
 		TaskName       string `json:"task_name"`
 		Role           string `json:"role"`
 		TargetDuration int    `json:"target_duration"`
 		SourceDay      string `json:"source_day"`
 		Origin         string `json:"origin,omitempty"`
+		DebtShare      int    `json:"debt_share,omitempty"`
 	}{
 		TaskName:       name,
 		Role:           role,
 		TargetDuration: targetDuration,
 		SourceDay:      sourceDay,
 		Origin:         origin,
+		DebtShare:      debtShare,
 	}
 
 	jsonData, err := json.Marshal(payload)

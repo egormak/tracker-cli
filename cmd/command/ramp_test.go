@@ -50,7 +50,7 @@ func TestRampCommand_Execution(t *testing.T) {
 						"enabled_roles": ["work", "learn"],
 						"enabled_tasks": ["home_task"],
 						"excluded_tasks": ["video"],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),
@@ -69,7 +69,7 @@ func TestRampCommand_Execution(t *testing.T) {
 						"enabled_roles": ["work", "learn"],
 						"enabled_tasks": ["home_task"],
 						"excluded_tasks": ["video"],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),
@@ -88,7 +88,7 @@ func TestRampCommand_Execution(t *testing.T) {
 						"enabled_roles": ["work", "learn"],
 						"enabled_tasks": ["home_task"],
 						"excluded_tasks": ["video"],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),
@@ -173,7 +173,7 @@ func TestRampCommand_StatusAfterManualReset(t *testing.T) {
 				"reset_baseline_minutes": 45,
 				"effective_focus_minutes": 3,
 				"date": "6 October 2026",
-				"config": {"cap_minutes": 25, "enabled_roles": ["work"], "default_rest_fallback": 15}
+				"config": {"cap_minutes": 25, "enabled_roles": ["work"], "default_fallback_minutes": 15}
 			}`)),
 			Header: make(http.Header),
 		}, nil

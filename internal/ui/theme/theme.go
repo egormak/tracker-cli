@@ -1,9 +1,7 @@
 package theme
 
 import (
-	"fmt"
 	"strings"
-	"tracker_cli/internal/pkg/restutil"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -84,11 +82,6 @@ func RoleBadge(role string) string {
 		Padding(0, 1).
 		MarginRight(1)
 	return badgeStyle.Render(strings.ToUpper(role))
-}
-
-func FormatRestTime(units int) string {
-	minutes := restutil.MinutesFromUnits(units)
-	return fmt.Sprintf("%.1f min", minutes)
 }
 
 func RenderProgressBar(width int, ratio float64, fillCol lipgloss.Color) string {

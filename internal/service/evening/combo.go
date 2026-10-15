@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/pkg/notifier"
@@ -19,9 +20,16 @@ type comboSprint struct {
 	run func() (completed bool, doneMinutes int, err error)
 }
 
+// chainOptions describes how a chain's sprints are started and labelled.
+type chainOptions struct {
+	origin    string // "combo" or "batch", sent to the server on start
+	debtShare int    // 0–100: % of each sprint that pays the task's past debt
+	label     string // shown in the progress lines
+}
+
 // Seams swapped by tests so the combo loop runs without a backend or desktop notifications.
 var (
-	comboSprintCreator = func(name string, duration int) (comboSprint, error) {
+	comboSprintCreator = func(name string, duration int, opts chainOptions) (comboSprint, error) {
 		// Combo sprint duration is derived from weekly deficit, not today's daily
 		// target, so percentSpecified=false bypasses the daily-target timeLeft cap.
 		taskTimer, err := task.CreateTaskTimerWithPercentFlag(name, duration, 100, false)
@@ -30,7 +38,8 @@ var (
 		}
 		// RunCombo sends one notification per transition itself.
 		taskTimer.SetCompletionNotify(false)
-		taskTimer.Origin = "combo"
+		taskTimer.Origin = opts.origin
+		taskTimer.DebtShare = opts.debtShare
 
 		return comboSprint{
 			role:     taskTimer.Role,
@@ -59,6 +68,45 @@ type finishedSprint struct {
 // chain ends there. Candidates with no remaining time and sprints stopped early
 // produce no notification.
 func RunCombo(out io.Writer, candidates []entity.EveningFocusCandidate, comboDuration int) error {
+	return runChain(out, candidates, comboDuration, chainOptions{origin: "combo", label: "Combo"})
+}
+
+// RunBatch runs an evening batch: the anchor and the next candidates as sprints of
+// sprintMinutes each; every sprint sends debtShare % of its minutes to its task's past debt.
+func RunBatch(out io.Writer, tasks []entity.EveningFocusCandidate, sprintMinutes, debtShare int) error {
+	return runChain(out, tasks, sprintMinutes, chainOptions{origin: "batch", debtShare: debtShare, label: "Батч"})
+}
+
+// BuildBatch returns the batch's tasks: the anchor first (the first candidate when anchor
+// is empty), then the next candidates in the server's order, n tasks at most.
+func BuildBatch(candidates []entity.EveningFocusCandidate, anchor string, n int) []entity.EveningFocusCandidate {
+	if n <= 0 {
+		return nil
+	}
+	var out []entity.EveningFocusCandidate
+	if anchor != "" {
+		first := entity.EveningFocusCandidate{TaskName: anchor}
+		for _, c := range candidates {
+			if strings.EqualFold(c.TaskName, anchor) {
+				first = c
+				break
+			}
+		}
+		out = append(out, first)
+	}
+	for _, c := range candidates {
+		if len(out) >= n {
+			break
+		}
+		if anchor != "" && strings.EqualFold(c.TaskName, anchor) {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func runChain(out io.Writer, candidates []entity.EveningFocusCandidate, comboDuration int, opts chainOptions) error {
 	var pending *finishedSprint
 	defer func() {
 		if pending != nil {
@@ -67,7 +115,7 @@ func RunCombo(out io.Writer, candidates []entity.EveningFocusCandidate, comboDur
 	}()
 
 	for i, candidate := range candidates {
-		sprint, err := comboSprintCreator(candidate.TaskName, comboDuration)
+		sprint, err := comboSprintCreator(candidate.TaskName, comboDuration, opts)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
 				fmt.Fprintf(out, "Task %s has no remaining time.\n", candidate.TaskName)
@@ -80,7 +128,7 @@ func RunCombo(out io.Writer, candidates []entity.EveningFocusCandidate, comboDur
 			notifyComboStep(i+1, len(candidates), candidate.TaskName, sprint.duration)
 			pending = nil
 		}
-		fmt.Fprintf(out, "⚡️ [Combo %d/%d] Starting sprint on '%s' (%d min)...\n", i+1, len(candidates), candidate.TaskName, sprint.duration)
+		fmt.Fprintf(out, "⚡️ [%s %d/%d] Starting sprint on '%s' (%d min)...\n", opts.label, i+1, len(candidates), candidate.TaskName, sprint.duration)
 
 		completed, doneMinutes, err := sprint.run()
 		if completed {
@@ -100,6 +148,10 @@ func RunCombo(out io.Writer, candidates []entity.EveningFocusCandidate, comboDur
 		}
 	}
 
-	fmt.Fprintln(out, "🎉 Evening Combo Chain completed successfully!")
+	if opts.origin == "batch" {
+		fmt.Fprintln(out, "🎉 Батч завершён!")
+	} else {
+		fmt.Fprintln(out, "🎉 Evening Combo Chain completed successfully!")
+	}
 	return nil
 }

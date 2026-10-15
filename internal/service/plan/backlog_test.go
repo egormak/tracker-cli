@@ -38,7 +38,7 @@ func TestRunBacklogBatch_ClampingAndProgress(t *testing.T) {
 		return 25 // Default duration
 	}
 
-	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int, restLimitActive bool) (int, error) {
+	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int) (int, error) {
 		executed = append(executed, executedTask{name: rollover.TaskName, duration: duration})
 		return duration, nil
 	}
@@ -52,7 +52,7 @@ func TestRunBacklogBatch_ClampingAndProgress(t *testing.T) {
 	// Task 1: RemainingTime is 20, default duration is 25 -> capped to RemainingTime 20. Remaining batch is 30 >= 20. Runs 20m.
 	// Task 2: RemainingTime is 30, default duration is 25 -> remaining batch is 10m -> clamped to 10m. Runs 10m.
 	// Total elapsed: 30m.
-	err := RunBacklogBatch(0, -1, 30*time.Minute)
+	err := RunBacklogBatch(0, 30*time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -76,7 +76,7 @@ func TestRunBacklogBatch_ClampingAndProgress(t *testing.T) {
 }
 
 func TestRunBacklogBatch_DurationValidation(t *testing.T) {
-	err := RunBacklogBatch(0, -1, 30*time.Second)
+	err := RunBacklogBatch(0, 30*time.Second)
 	if err == nil {
 		t.Fatal("expected error for batch duration < 1m, got nil")
 	}
@@ -90,7 +90,7 @@ func TestRunBacklogBatch_EmptyRollovers(t *testing.T) {
 		return []entity.RolloverTask{}, nil
 	}
 
-	err := RunBacklogBatch(0, -1, 30*time.Minute)
+	err := RunBacklogBatch(0, 30*time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error for empty rollovers, got %v", err)
 	}
@@ -114,11 +114,11 @@ func TestRunBacklogBatch_Abort(t *testing.T) {
 
 	backlogDurationGetter = func() int { return 15 }
 
-	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int, restLimitActive bool) (int, error) {
+	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int) (int, error) {
 		return 5, task.ErrTaskAborted
 	}
 
-	err := RunBacklogBatch(0, -1, 30*time.Minute)
+	err := RunBacklogBatch(0, 30*time.Minute)
 	if err != nil {
 		t.Fatalf("expected nil error on abort, got %v", err)
 	}

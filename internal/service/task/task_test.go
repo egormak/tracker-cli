@@ -149,7 +149,7 @@ func TestGetRampDurationForTask(t *testing.T) {
 						"enabled_roles": ["work", "learn"],
 						"enabled_tasks": ["home_task"],
 						"excluded_tasks": ["video", "movies", "games", "telegram"],
-						"default_rest_fallback": 15
+						"default_fallback_minutes": 15
 					}
 				}`)),
 				Header: make(http.Header),

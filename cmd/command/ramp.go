@@ -61,7 +61,7 @@ func runRampStatus(cmd *cobra.Command) error {
 	cmd.Printf("Потолок:       %s\n", capStr)
 	cmd.Printf("Активно:       %s\n", activeStr)
 	cmd.Printf("Исключения:    %s\n", excludedStr)
-	cmd.Printf("Отдых fallback:%d мин\n\n", status.Config.DefaultRestFallback)
+	cmd.Printf("Длина по умолчанию: %d мин\n\n", status.Config.DefaultFallbackMinutes)
 	cmd.Println("[r] Сбросить на 1м: tracker ramp reset")
 
 	return nil

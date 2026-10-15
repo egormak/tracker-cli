@@ -1,11 +1,11 @@
 package entity
 
 type RampConfig struct {
-	CapMinutes          int      `json:"cap_minutes"`
-	EnabledRoles        []string `json:"enabled_roles"`
-	EnabledTasks        []string `json:"enabled_tasks"`
-	ExcludedTasks       []string `json:"excluded_tasks"`
-	DefaultRestFallback int      `json:"default_rest_fallback"`
+	CapMinutes             int      `json:"cap_minutes"`
+	EnabledRoles           []string `json:"enabled_roles"`
+	EnabledTasks           []string `json:"enabled_tasks"`
+	ExcludedTasks          []string `json:"excluded_tasks"`
+	DefaultFallbackMinutes int      `json:"default_fallback_minutes"`
 }
 
 type RampStatus struct {

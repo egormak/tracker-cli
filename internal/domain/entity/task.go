@@ -58,4 +58,6 @@ type TaskRecord struct {
 	TimeDuration int    `json:"time_duration"`
 	Date         string `json:"date"`
 	SourceDay    string `json:"source_day"`
+	// Split is returned by a timer stop: where the session's minutes went.
+	Split []SplitPart `json:"split,omitempty"`
 }

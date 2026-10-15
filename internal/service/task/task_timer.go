@@ -15,11 +15,9 @@ import (
 	"tracker_cli/config"
 	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/pkg/notifier"
-	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/repository/ws"
 	"tracker_cli/internal/service/procent"
-	"tracker_cli/internal/service/rest"
 	"tracker_cli/internal/service/statistic"
 	"tracker_cli/internal/service/telegram"
 )
@@ -254,6 +252,7 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.task.TimeEnd = time.Now()
 		m.task.TimeDone = float64(msg.record.TimeDuration)
+		m.task.Split = msg.record.Split
 		m.exitState = exitState{shouldSave: true, completed: m.elapsed >= m.duration, abortPlan: msg.abortPlan}
 		return m, tea.Quit
 
@@ -412,7 +411,7 @@ func formatDuration(d time.Duration) string {
 
 func (t *TaskTimer) Run() error {
 	// Call server to start the running task
-	runningTask, err := api.StartRunningTask(t.Name, t.Role, t.TimeDuration, t.SourceDay, t.Origin)
+	runningTask, err := api.StartRunningTask(t.Name, t.Role, t.TimeDuration, t.SourceDay, t.Origin, t.DebtShare)
 	if err != nil {
 		return fmt.Errorf("failed to start task on server: %w", err)
 	}
@@ -487,10 +486,6 @@ func (t *TaskTimer) started() bool {
 	return !t.TimeBegin.IsZero()
 }
 
-func (t *TaskTimer) SetRestLimitActive(active bool) {
-	t.restLimitActive = active
-}
-
 // SetCompletionNotify controls whether a completed run fires the desktop
 // "task completed" notification. Callers that chain sprints and send their own
 // notification (evening combo) disable it to avoid overlapping banners.
@@ -527,24 +522,6 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 			notifyMessage = message
 		}
 
-		if !t.restLimitActive {
-			if restUnits, err := api.GetRestTime(); err != nil {
-				slog.Error("failed to fetch rest balance for notification", "error", err)
-			} else {
-				restMinutes := restutil.MinutesFromUnits(restUnits)
-				if restMinutes > 0 {
-					restStatement := fmt.Sprintf("Rest balance %.1f minutes. Time to rest or do some exercise.", restMinutes)
-					if notifyMessage != "" {
-						notifyMessage = fmt.Sprintf("%s %s", notifyMessage, restStatement)
-					} else if t.Percent > 0 {
-						notifyMessage = fmt.Sprintf("Completed planned task '%s' (%d%%). %s", t.Name, t.Percent, restStatement)
-					} else {
-						notifyMessage = fmt.Sprintf("Completed task '%s'. %s", t.Name, restStatement)
-					}
-				}
-			}
-		}
-
 		if msg := strings.TrimSpace(notifyMessage); msg != "" {
 			telegram.TelegramMessageSend(msg)
 		}
@@ -554,7 +531,38 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 		}
 	}
 
+	if line := FormatSplit(t.Split); line != "" {
+		fmt.Println(line)
+	}
 	statistic.StatisticTaskShow(t.Name)
 	statistic.StatisticFullShow()
-	rest.RestShow()
+}
+
+var splitDayShort = map[string]string{
+	"monday": "Пн", "tuesday": "Вт", "wednesday": "Ср", "thursday": "Чт",
+	"friday": "Пт", "saturday": "Сб", "sunday": "Вс",
+}
+
+// FormatSplit renders where a stopped session's minutes went, e.g. "Записано: сегодня 15 · Ср +5".
+// It returns "" when everything went to today, the usual case.
+func FormatSplit(parts []entity.SplitPart) string {
+	if len(parts) == 0 || (len(parts) == 1 && parts[0].Kind == "today") {
+		return ""
+	}
+	var out []string
+	for _, p := range parts {
+		switch p.Kind {
+		case "today":
+			out = append(out, fmt.Sprintf("сегодня %d", p.Minutes))
+		case "debt":
+			day := splitDayShort[p.Day]
+			if day == "" {
+				day = p.Day
+			}
+			out = append(out, fmt.Sprintf("%s +%d", day, p.Minutes))
+		case "tomorrow":
+			out = append(out, fmt.Sprintf("завтра +%d", p.Minutes))
+		}
+	}
+	return "Записано: " + strings.Join(out, " · ")
 }

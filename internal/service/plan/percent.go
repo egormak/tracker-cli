@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"tracker_cli/internal/pkg/restutil"
 	"tracker_cli/internal/repository/api"
 	"tracker_cli/internal/service"
 	"tracker_cli/internal/service/task"
@@ -19,7 +18,6 @@ import (
 
 var (
 	telegramSender     = telegram.TelegramMessageSend
-	restBalanceGetter  = api.GetRestTime
 	planPercentRotator = api.RotatePlanPercent
 
 	percentTaskSelector = func(useSchedule bool) (name string, percent int, duration int, sourceDay string, err error) {
@@ -46,7 +44,7 @@ var (
 		return name, percent, duration, "", nil
 	}
 
-	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string, restLimitActive bool) (int, error) {
+	percentTimerRunner = func(ctx context.Context, delay time.Duration, name string, duration int, percent int, sourceDay string) (int, error) {
 		timer, err := task.CreateTaskTimerWithSourceDay(name, duration, percent, sourceDay)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
@@ -55,7 +53,6 @@ var (
 			return 0, fmt.Errorf("initialise task timer: %w", err)
 		}
 		timer.SourceDay = sourceDay
-		timer.SetRestLimitActive(restLimitActive)
 
 		slog.Info("starting planned task", "task", name, "percent", percent, "duration", duration)
 
@@ -80,22 +77,22 @@ var (
 	}
 )
 
-// RunPercent triggers the next task from the percent plan queue.
-func RunPercent(delay time.Duration, restLimitMinutes int) error {
-	return runPercentInternal(delay, restLimitMinutes, 0, false)
+// RunPercent runs the next task from the percent plan queue.
+func RunPercent(delay time.Duration) error {
+	return runPercentInternal(delay, 0, false)
 }
 
-// RunPercentSchedule triggers the next task from the percent plan queue with schedule awareness.
-func RunPercentSchedule(delay time.Duration, restLimitMinutes int) error {
-	return runPercentInternal(delay, restLimitMinutes, 0, true)
+// RunPercentSchedule runs the next task from the percent plan queue with schedule awareness.
+func RunPercentSchedule(delay time.Duration) error {
+	return runPercentInternal(delay, 0, true)
 }
 
-// RunPercentBatch triggers tasks from the percent plan queue for a target batch duration.
-func RunPercentBatch(delay time.Duration, restLimitMinutes int, batchDuration time.Duration, useSchedule bool) error {
-	return runPercentInternal(delay, restLimitMinutes, batchDuration, useSchedule)
+// RunPercentBatch keeps running tasks from the percent plan queue until batchDuration is used up.
+func RunPercentBatch(delay time.Duration, batchDuration time.Duration, useSchedule bool) error {
+	return runPercentInternal(delay, batchDuration, useSchedule)
 }
 
-func runPercentInternal(delay time.Duration, restLimitMinutes int, batchDuration time.Duration, useSchedule bool) error {
+func runPercentInternal(delay time.Duration, batchDuration time.Duration, useSchedule bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -121,23 +118,7 @@ func runPercentInternal(delay time.Duration, restLimitMinutes int, batchDuration
 				break
 			}
 
-			if restLimitMinutes >= 0 {
-				limitUnits := restutil.UnitsFromMinutes(restLimitMinutes)
-				restUnits, err := restBalanceGetter()
-				if err != nil {
-					return fmt.Errorf("fetch rest balance: %w", err)
-				}
-
-				currentMinutes := restutil.MinutesFromUnits(restUnits)
-				if restUnits > limitUnits {
-					slog.Info("rest limit reached", "rest_minutes", currentMinutes, "limit_minutes", restLimitMinutes)
-					telegramSender(fmt.Sprintf("Rest limit reached: %.1f minutes available (limit %d). Take a break or do some exercise.", currentMinutes, restLimitMinutes))
-					return nil
-				}
-			}
-
-			restLimitActive := restLimitMinutes >= 0
-			actualTaskDone, err := runPercentOnce(ctx, delay, restLimitActive, useSchedule, remainingBatch)
+			actualTaskDone, err := runPercentOnce(ctx, delay, useSchedule, remainingBatch)
 			if err != nil {
 				if errors.Is(err, task.ErrTaskAborted) {
 					return nil
@@ -182,51 +163,19 @@ func runPercentInternal(delay time.Duration, restLimitMinutes int, batchDuration
 		return nil
 	}
 
-	if restLimitMinutes < 0 {
-		if logger() {
-			return nil
-		}
-		if _, err := runPercentOnce(ctx, delay, false, useSchedule); err != nil {
-			if errors.Is(err, task.ErrTaskAborted) {
-				return nil
-			}
-			return err
-		}
-		if logger() {
-			return nil
-		}
+	if logger() {
 		return nil
 	}
-
-	limitUnits := restutil.UnitsFromMinutes(restLimitMinutes)
-
-	for {
-		if logger() {
+	if _, err := runPercentOnce(ctx, delay, useSchedule); err != nil {
+		if errors.Is(err, task.ErrTaskAborted) {
 			return nil
 		}
-
-		restUnits, err := restBalanceGetter()
-		if err != nil {
-			return fmt.Errorf("fetch rest balance: %w", err)
-		}
-
-		currentMinutes := restutil.MinutesFromUnits(restUnits)
-		if restUnits > limitUnits {
-			slog.Info("rest limit reached", "rest_minutes", currentMinutes, "limit_minutes", restLimitMinutes)
-			telegramSender(fmt.Sprintf("Rest limit reached: %.1f minutes available (limit %d). Take a break or do some exercise.", currentMinutes, restLimitMinutes))
-			return nil
-		}
-
-		if _, err := runPercentOnce(ctx, delay, true, useSchedule); err != nil {
-			if errors.Is(err, task.ErrTaskAborted) {
-				return nil
-			}
-			return err
-		}
+		return err
 	}
+	return nil
 }
 
-func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bool, useSchedule bool, maxDuration ...int) (int, error) {
+func runPercentOnce(ctx context.Context, delay time.Duration, useSchedule bool, maxDuration ...int) (int, error) {
 	if delay < 0 {
 		delay = 0
 	}
@@ -247,7 +196,7 @@ func runPercentOnce(ctx context.Context, delay time.Duration, restLimitActive bo
 		duration = maxDuration[0]
 	}
 
-	return percentTimerRunner(ctx, delay, name, duration, percent, sourceDay, restLimitActive)
+	return percentTimerRunner(ctx, delay, name, duration, percent, sourceDay)
 }
 
 func interruptLogger(ctx context.Context) func() bool {

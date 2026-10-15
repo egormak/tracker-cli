@@ -67,13 +67,6 @@ func NotifyTaskCompleted(taskName, role string, durationMinutes int) {
 	Notify(title, message)
 }
 
-// NotifyRestBalance alerts the user about rest bank balance
-func NotifyRestBalance(restMinutes float64) {
-	title := "☕ Tracker — Rest Reminder"
-	message := fmt.Sprintf("You have %.1f minutes of rest banked. Time to stretch or relax!", restMinutes)
-	Notify(title, message)
-}
-
 // NotifyComboStep alerts the user that the evening combo chain is advancing to the next step
 func NotifyComboStep(step, total int, nextTask string, durationMinutes int) {
 	title := "⚡ Tracker — Evening Combo Advance"

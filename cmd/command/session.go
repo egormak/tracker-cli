@@ -40,17 +40,11 @@ var sessionCmd = &cobra.Command{
 			return err
 		}
 
-		restLimit, err := cmd.Flags().GetInt("rest-limit")
-		if err != nil {
-			return err
-		}
-
-		return plan.RunPercentBatch(delay, restLimit, duration, true)
+		return plan.RunPercentBatch(delay, duration, true)
 	},
 }
 
 func init() {
 	sessionCmd.Flags().Duration("delay", 15*time.Second, "Delay before starting each task timer")
-	sessionCmd.Flags().IntP("rest-limit", "r", -1, "Maximum rest minutes before stopping")
 	rootCmd.AddCommand(sessionCmd)
 }
