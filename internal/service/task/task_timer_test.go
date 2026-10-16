@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"tracker_cli/internal/domain/entity"
 	"tracker_cli/internal/repository/ws"
 )
@@ -207,5 +209,52 @@ func TestTeaTimerModel_WSEventMsg_TaskPausedAndResumed(t *testing.T) {
 	tm2, _ := newModel2.(teaTimerModel)
 	if !tm2.isRunning {
 		t.Errorf("expected isRunning true after resume event, got false")
+	}
+}
+
+// A heartbeat tick that lands while paused must keep the loop alive: before the fix it
+// ended the loop, so after resume no heartbeat was sent and the server's watchdog paused
+// the task again 3 minutes later.
+func TestTeaTimerModel_HeartbeatSurvivesPauseResume(t *testing.T) {
+	var sent []string
+	orig := heartbeatSender
+	heartbeatSender = func(name string) (entity.RunningTask, error) {
+		sent = append(sent, name)
+		return entity.RunningTask{}, nil
+	}
+	t.Cleanup(func() { heartbeatSender = orig })
+
+	m := newTeaTimerModel(&TaskTimer{Name: "games", TimeDuration: 30}, entity.RunningTask{
+		TaskName: "games", IsRunning: true, TargetDuration: 30, StartTime: time.Now(),
+	})
+
+	// Paused: the tick sends nothing but schedules the next one.
+	m.isRunning = false
+	next, cmd := m.Update(heartbeatTickMsg{})
+	m = next.(teaTimerModel)
+	if cmd == nil {
+		t.Fatal("paused tick ended the heartbeat loop")
+	}
+	if len(sent) != 0 {
+		t.Fatalf("paused tick sent a heartbeat: %v", sent)
+	}
+
+	// Resumed: the next tick sends a heartbeat and schedules the following one.
+	next, _ = m.Update(togglePauseResultMsg{task: entity.RunningTask{TaskName: "games", IsRunning: true, TargetDuration: 30, StartTime: time.Now()}})
+	m = next.(teaTimerModel)
+	_, cmd = m.Update(heartbeatTickMsg{})
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("expected a batch of send + next tick, got %T", cmd())
+	}
+	batch[0]()
+	if len(sent) != 1 || sent[0] != "games" {
+		t.Fatalf("expected one heartbeat for games after resume, got %v", sent)
+	}
+
+	// Stopping ends the loop.
+	m.stopping = true
+	if _, cmd := m.Update(heartbeatTickMsg{}); cmd != nil {
+		t.Fatal("expected no heartbeat while stopping")
 	}
 }

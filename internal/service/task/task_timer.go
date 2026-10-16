@@ -173,16 +173,26 @@ func newTeaTimerModel(task *TaskTimer, runningTask entity.RunningTask) teaTimerM
 
 type heartbeatTickMsg struct{}
 
-func heartbeatCmd(taskName string) tea.Cmd {
-	return tea.Tick(20*time.Second, func(t time.Time) tea.Msg {
-		_, _ = api.SendHeartbeat(taskName)
-		return heartbeatTickMsg{}
-	})
+// heartbeatSender is swapped by tests.
+var heartbeatSender = api.SendHeartbeat
+
+// heartbeatTickCmd fires every 20s for as long as the timer is open, paused or not, so the
+// heartbeat resumes after a pause: the server's watchdog pauses a running task whose lease
+// (3 min) is not renewed.
+func heartbeatTickCmd() tea.Cmd {
+	return tea.Tick(20*time.Second, func(time.Time) tea.Msg { return heartbeatTickMsg{} })
+}
+
+func sendHeartbeatCmd(taskName string) tea.Cmd {
+	return func() tea.Msg {
+		_, _ = heartbeatSender(taskName)
+		return nil
+	}
 }
 
 func (m teaTimerModel) Init() tea.Cmd {
 	m.task.beginSession(m.startTime)
-	return tea.Batch(pollStatusCmd(m.task.Name), smoothTickCmd(), heartbeatCmd(m.task.Name))
+	return tea.Batch(pollStatusCmd(m.task.Name), smoothTickCmd(), heartbeatTickCmd())
 }
 
 func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -192,9 +202,10 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.isRunning {
-			return m, heartbeatCmd(m.task.Name)
+			return m, tea.Batch(sendHeartbeatCmd(m.task.Name), heartbeatTickCmd())
 		}
-		return m, nil
+		// Paused: keep ticking without sending, so a later resume is covered.
+		return m, heartbeatTickCmd()
 
 	case smoothTickMsg:
 		if m.stopping {
