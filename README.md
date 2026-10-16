@@ -33,7 +33,7 @@ The CLI is stateless and requires an accessible `tracker-server` backend. Config
 - `tracker menu [-t min] [-p percent]` - Interactive task picker table, then starts timer.
 - `tracker task -n NAME [-t min] [-p percent] [-s source-day] [--previous-days] [--debt P]` - Start authoritative task timer; `--debt P` sends P% of the session to this task's previous-days debt on stop. When the server splits a session, a line like `Записано: сегодня 15 · Ср +5` is printed.
 - `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]` - Evening Catch-Up sprint for the task most behind to date (debt, then weekly gap); `-C` chains the top-3 candidates sequentially.
-- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks 3|4]` - Evening batch: the anchor plus the next candidates by debt, one sprint each (default 15m).
+- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks N]` - Evening batch: the anchor plus the next candidates by debt, one sprint each (default 15m).
 - `tracker debt` - Show this week's debt: summary line, week strip, and items.
 - `tracker session [duration]` (alias: `batch`) - Run a schedule-aware percent batch session (default 30m).
 

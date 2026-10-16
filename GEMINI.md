@@ -47,7 +47,7 @@ go test ./internal/service/plan -run TestRunPercentBatch
 - `tracker menu [-t min] [-p percent]`: Interactive Bubble Tea task picker table, then runs timer for chosen task.
 - `tracker dashboard` (aliases: `tui`, `dash`): Full-screen live TUI monitoring active timer, daily progress, schedule, rollover, debt (line + week strip), evening focus, and ramp ladder.
 - `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]`: Evening Catch-Up sprint for the task most behind to date (debt, then weekly gap); `-C` chains the top-3 candidates sequentially.
-- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks 3|4]`: Evening batch — anchor + next candidates by debt, one sprint each (`BuildBatch` / `RunBatch` in `internal/service/evening/combo.go`).
+- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks N]`: Evening batch — anchor + next candidates by debt, one sprint each (`BuildBatch` / `RunBatch` in `internal/service/evening/combo.go`).
 - `tracker debt`: This week's debt line, week strip, and items (`internal/service/debt`).
 - `tracker session [duration]` (alias: `batch`): Run a schedule-aware percent batch session (defaults to 30m) clamping tasks to the remaining time budget.
 - `tracker plan percent run|schedule`: Run next task in percent plan queue (`--delay`, `-b batch`); without `-b` one task runs.

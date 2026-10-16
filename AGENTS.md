@@ -46,7 +46,7 @@
 
 ### 3. Debt & Evening Batch
 - `tracker debt` (`internal/service/debt`) renders `GET /api/v1/debt` (`api.GetDebt()`): summary line + week strip + items; the dashboard footer and progress card reuse `Line` / `WeekStrip`.
-- `tracker evening --batch` (`internal/service/evening/combo.go`): `BuildBatch` puts the anchor first, then the next server candidates (ranked by debt to date), `--tasks` 3 or 4; `RunBatch` runs one sprint each through `runChain` (shared with `--combo`, configured by `chainOptions`) with origin `batch` and `--debt` share.
+- `tracker evening --batch` (`internal/service/evening/combo.go`): `BuildBatch` puts the anchor first, then the next server candidates (ranked by debt to date), `--tasks` from 1 to the anchor plus the candidates (`BatchCapacity`; an explicit larger value is an error, the default 3 shrinks); `RunBatch` runs one sprint each through `runChain` (shared with `--combo`, configured by `chainOptions`) with origin `batch` and `--debt` share.
 
 ### 4. API Client Consistency
 - When adding backend calls, implement them in `internal/repository/api/` using `sendRequest` and typed structs, rather than creating inline `http.Client`s in service packages.
@@ -62,7 +62,7 @@
 - `tracker menu [-t min] [-p percent]`: Interactive Bubble Tea task picker table, then starts timer.
 - `tracker dashboard` (aliases: `tui`, `dash`): Live full-screen TUI dashboard.
 - `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]`: Evening Catch-Up mode for the task most behind to date (debt, then weekly gap); `-C` chains top-3 candidates.
-- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks 3|4]`: Evening batch — anchor + next candidates by debt, one sprint each.
+- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks N]`: Evening batch — anchor + next candidates by debt, one sprint each.
 - `tracker debt`: This week's debt line, week strip, and items.
 - `tracker session [duration]` (alias: `batch`): Schedule-aware percent batch session (default 30m).
 - `tracker plan backlog` (aliases: `catchup`, `game`): Sequence through deficit/rollover tasks (`--delay`, `-b batch`); without `-b` runs until no backlog is left.

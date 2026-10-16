@@ -106,6 +106,21 @@ func BuildBatch(candidates []entity.EveningFocusCandidate, anchor string, n int)
 	return out
 }
 
+// BatchCapacity is the largest batch BuildBatch can fill: the anchor (when given) plus
+// every candidate other than the anchor.
+func BatchCapacity(candidates []entity.EveningFocusCandidate, anchor string) int {
+	if anchor == "" {
+		return len(candidates)
+	}
+	n := 1
+	for _, c := range candidates {
+		if !strings.EqualFold(c.TaskName, anchor) {
+			n++
+		}
+	}
+	return n
+}
+
 func runChain(out io.Writer, candidates []entity.EveningFocusCandidate, comboDuration int, opts chainOptions) error {
 	var pending *finishedSprint
 	defer func() {

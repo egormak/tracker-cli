@@ -118,7 +118,7 @@ func init() {
 	eveningCmd.Flags().BoolP("batch", "b", false, "Run an evening batch: the anchor and the next candidates by debt, one sprint each (-t, default 15)")
 	eveningCmd.Flags().StringP("anchor", "a", "", "Batch: first task; without it the picker asks (Enter picks the anchor)")
 	eveningCmd.Flags().Int("debt", 0, "Percent (0-100) of every sprint that pays the task's previous-days debt")
-	eveningCmd.Flags().Int("tasks", 3, "Batch: number of tasks, 3 or 4")
+	eveningCmd.Flags().Int("tasks", 3, "Batch: number of tasks, from 1 to the anchor plus tonight's candidates")
 
 	rootCmd.AddCommand(eveningCmd)
 }
@@ -139,8 +139,8 @@ func runEveningBatch(cmd *cobra.Command, category, skipTask string) error {
 	if debtShare < 0 || debtShare > 100 {
 		return fmt.Errorf("--debt must be between 0 and 100, got %d", debtShare)
 	}
-	if tasks != 3 && tasks != 4 {
-		return fmt.Errorf("--tasks must be 3 or 4, got %d", tasks)
+	if tasks < 1 {
+		return fmt.Errorf("--tasks must be at least 1, got %d", tasks)
 	}
 
 	if anchor == "" {
@@ -161,11 +161,19 @@ func runEveningBatch(cmd *cobra.Command, category, skipTask string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch evening focus: %w", err)
 	}
-	batch := evening.BuildBatch(focus.Candidates, anchor, tasks)
-	if len(batch) == 0 {
+	capacity := evening.BatchCapacity(focus.Candidates, anchor)
+	if capacity == 0 {
 		cmd.Println("All weekly tasks completed.")
 		return nil
 	}
+	if tasks > capacity {
+		// The default shrinks to what is available; an explicit --tasks must fit.
+		if cmd.Flags().Changed("tasks") {
+			return fmt.Errorf("--tasks must be between 1 and %d (tasks available tonight), got %d", capacity, tasks)
+		}
+		tasks = capacity
+	}
+	batch := evening.BuildBatch(focus.Candidates, anchor, tasks)
 
 	names := make([]string, len(batch))
 	for i, c := range batch {

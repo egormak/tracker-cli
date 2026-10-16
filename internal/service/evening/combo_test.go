@@ -199,11 +199,35 @@ func TestBuildBatch(t *testing.T) {
 		{"telegram", 3, []string{"telegram", "games", "home_task"}},
 		{"Home_Task", 4, []string{"home_task", "games", "telegram", "video"}},
 		{"reading", 3, []string{"reading", "games", "home_task"}}, // anchor outside the candidates
+		{"work", 1, []string{"work"}},
+		{"telegram", 2, []string{"telegram", "games"}},
+		{"", 5, []string{"games", "home_task", "telegram", "video", "movies"}},
+		{"video", 5, []string{"video", "games", "home_task", "telegram", "movies"}},
 	}
 	for _, c := range cases {
 		if got := names(BuildBatch(cands, c.anchor, c.n)); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("BuildBatch(%q, %d) = %v, want %v", c.anchor, c.n, got, c.want)
 		}
+	}
+}
+
+func TestBatchCapacity(t *testing.T) {
+	cands := comboCandidates("games", "home_task", "telegram")
+	cases := []struct {
+		anchor string
+		want   int
+	}{
+		{"", 3},
+		{"Telegram", 3}, // anchor among the candidates counts once
+		{"work", 4},     // anchor outside the candidates adds one
+	}
+	for _, c := range cases {
+		if got := BatchCapacity(cands, c.anchor); got != c.want {
+			t.Errorf("BatchCapacity(%q) = %d, want %d", c.anchor, got, c.want)
+		}
+	}
+	if got := BatchCapacity(nil, ""); got != 0 {
+		t.Errorf("BatchCapacity(nil, \"\") = %d, want 0", got)
 	}
 }
 
