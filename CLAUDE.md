@@ -72,7 +72,7 @@ Both loop only with `--batch` (a wall-clock budget: each task's duration is clam
 
 - `tracker debt` (`internal/service/debt`) renders `GET /api/v1/debt` (`api.GetDebt()`): a one-line summary (`Line`), the week strip (`WeekStrip`) and the items. The dashboard and the progress card reuse `Line`/`WeekStrip`.
 - `tracker task --debt P` / `evening --batch --debt P` send `debt_share` on start; the server splits the session on stop (share → own past debt, rest → today up to target, excess → debt, leftover → tomorrow for strict tasks).
-- `tracker evening --batch` (`internal/service/evening/combo.go`): `BuildBatch` puts the anchor (`-a`, else picked in the evening picker) first, then the next server candidates (ranked by debt to date) up to `--tasks` (1 to `BatchCapacity` = anchor + the other candidates; an explicit larger value is an error, the default 3 shrinks to fit); `RunBatch` runs them one sprint each (`-t`, default 15) through the same `runChain` as `--combo`, with origin `batch`. The evening picker shows `долг Nm · неделя −Nm` per candidate.
+- `tracker evening --batch` (`internal/service/evening/combo.go`): `BuildBatch` puts the anchor (`-a`, else picked in the evening picker) first, then the next server candidates (ranked by debt to date) up to `--tasks` (1 to `BatchCapacity` = anchor + the other candidates; an explicit larger value is an error, the default 3 shrinks to fit); `RunBatch` runs them one sprint each (`-t`, default 15; the anchor gets `-T/--anchor-time` when set, via `chainOptions.firstDuration`) through the same `runChain` as `--combo`, with origin `batch`. The evening picker shows `долг Nm · неделя −Nm` per candidate.
 
 ## Commands
 
@@ -80,7 +80,7 @@ Both loop only with `--batch` (a wall-clock budget: each task's duration is clam
 - `tracker menu [-t min] [-p percent]` — interactive task picker, then runs the timer
 - `tracker dashboard` (`tui`, `dash`) — live TUI dashboard
 - `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]` — "Evening Catch-Up" picker for the task most behind to date (debt, then weekly gap); `-C` chains the top-3 candidates
-- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks N]` — evening batch: anchor + next candidates by debt, one sprint each
+- `tracker evening --batch [-a anchor] [-T anchor-min] [-t 15] [--debt P] [--tasks N]` — evening batch: anchor + next candidates by debt, one sprint each
 - `tracker debt` — this week's debt line, week strip and items
 - `tracker session [duration]` (`batch`) — schedule-aware percent batch session
 - `tracker plan backlog` (`catchup`, `game`) / `plan percent run|schedule` — planning loops (`--delay`, `-b batch`)

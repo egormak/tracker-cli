@@ -25,6 +25,8 @@ type chainOptions struct {
 	origin    string // "combo" or "batch", sent to the server on start
 	debtShare int    // 0–100: % of each sprint that pays the task's past debt
 	label     string // shown in the progress lines
+	// firstDuration, when > 0, replaces the sprint length for the first task (the batch anchor).
+	firstDuration int
 }
 
 // Seams swapped by tests so the combo loop runs without a backend or desktop notifications.
@@ -71,10 +73,16 @@ func RunCombo(out io.Writer, candidates []entity.EveningFocusCandidate, comboDur
 	return runChain(out, candidates, comboDuration, chainOptions{origin: "combo", label: "Combo"})
 }
 
-// RunBatch runs an evening batch: the anchor and the next candidates as sprints of
-// sprintMinutes each; every sprint sends debtShare % of its minutes to its task's past debt.
-func RunBatch(out io.Writer, tasks []entity.EveningFocusCandidate, sprintMinutes, debtShare int) error {
-	return runChain(out, tasks, sprintMinutes, chainOptions{origin: "batch", debtShare: debtShare, label: "Батч"})
+// RunBatch runs an evening batch: the anchor for anchorMinutes (0 = sprintMinutes), then the
+// next candidates as sprints of sprintMinutes each; every sprint sends debtShare % of its
+// minutes to its task's past debt.
+func RunBatch(out io.Writer, tasks []entity.EveningFocusCandidate, sprintMinutes, anchorMinutes, debtShare int) error {
+	return runChain(out, tasks, sprintMinutes, chainOptions{
+		origin:        "batch",
+		debtShare:     debtShare,
+		label:         "Батч",
+		firstDuration: anchorMinutes,
+	})
 }
 
 // BuildBatch returns the batch's tasks: the anchor first (the first candidate when anchor
@@ -130,7 +138,11 @@ func runChain(out io.Writer, candidates []entity.EveningFocusCandidate, comboDur
 	}()
 
 	for i, candidate := range candidates {
-		sprint, err := comboSprintCreator(candidate.TaskName, comboDuration, opts)
+		duration := comboDuration
+		if i == 0 && opts.firstDuration > 0 {
+			duration = opts.firstDuration
+		}
+		sprint, err := comboSprintCreator(candidate.TaskName, duration, opts)
 		if err != nil {
 			if errors.Is(err, task.ErrTaskCompleted) {
 				fmt.Fprintf(out, "Task %s has no remaining time.\n", candidate.TaskName)

@@ -234,7 +234,7 @@ func TestBatchCapacity(t *testing.T) {
 func TestRunBatchSendsOriginAndDebtShare(t *testing.T) {
 	_, started := fakeCombo(t, map[string]fakeSprint{"games": {completed: true}, "video": {completed: true}})
 	var out bytes.Buffer
-	if err := RunBatch(&out, comboCandidates("games", "video"), 15, 25); err != nil {
+	if err := RunBatch(&out, comboCandidates("games", "video"), 15, 0, 25); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !reflect.DeepEqual(*started, []string{"games", "video"}) {
@@ -245,5 +245,18 @@ func TestRunBatchSendsOriginAndDebtShare(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "[Батч 1/2]") || !strings.Contains(out.String(), "Батч завершён") {
 		t.Errorf("unexpected output:\n%s", out.String())
+	}
+}
+
+func TestRunBatchAnchorDuration(t *testing.T) {
+	_, _ = fakeCombo(t, map[string]fakeSprint{"work": {completed: true}, "games": {completed: true}, "video": {completed: true}})
+	var out bytes.Buffer
+	if err := RunBatch(&out, comboCandidates("work", "games", "video"), 15, 60, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"'work' (60 min)", "'games' (15 min)", "'video' (15 min)"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output:\n%s", want, out.String())
+		}
 	}
 }

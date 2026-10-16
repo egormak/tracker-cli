@@ -117,6 +117,7 @@ func init() {
 	eveningCmd.Flags().IntP("combo-time", "d", 0, "Sprint duration for each step in combo chain (e.g. 10, 15, 20)")
 	eveningCmd.Flags().BoolP("batch", "b", false, "Run an evening batch: the anchor and the next candidates by debt, one sprint each (-t, default 15)")
 	eveningCmd.Flags().StringP("anchor", "a", "", "Batch: first task; without it the picker asks (Enter picks the anchor)")
+	eveningCmd.Flags().IntP("anchor-time", "T", 0, "Batch: anchor sprint in minutes (default: the same as -t)")
 	eveningCmd.Flags().Int("debt", 0, "Percent (0-100) of every sprint that pays the task's previous-days debt")
 	eveningCmd.Flags().Int("tasks", 3, "Batch: number of tasks, from 1 to the anchor plus tonight's candidates")
 
@@ -131,10 +132,17 @@ func runEveningBatch(cmd *cobra.Command, category, skipTask string) error {
 		sprint, _ = cmd.Flags().GetInt("time")
 	}
 	anchor, _ := cmd.Flags().GetString("anchor")
+	anchorTime, _ := cmd.Flags().GetInt("anchor-time")
 	debtShare, _ := cmd.Flags().GetInt("debt")
 	tasks, _ := cmd.Flags().GetInt("tasks")
 	if sprint <= 0 {
 		return fmt.Errorf("sprint must be positive, got %d", sprint)
+	}
+	if anchorTime < 0 {
+		return fmt.Errorf("--anchor-time must be positive, got %d", anchorTime)
+	}
+	if anchorTime == 0 {
+		anchorTime = sprint
 	}
 	if debtShare < 0 || debtShare > 100 {
 		return fmt.Errorf("--debt must be between 0 and 100, got %d", debtShare)
@@ -180,12 +188,19 @@ func runEveningBatch(cmd *cobra.Command, category, skipTask string) error {
 		names[i] = c.TaskName
 	}
 	plan := fmt.Sprintf("🧩 Батч: %s · по %d мин", strings.Join(names, " → "), sprint)
+	if anchorTime != sprint {
+		names[0] = fmt.Sprintf("%s %d мин", names[0], anchorTime)
+		plan = fmt.Sprintf("🧩 Батч: %s", strings.Join(names, " → "))
+		if len(batch) > 1 {
+			plan += fmt.Sprintf(" · остальные по %d мин", sprint)
+		}
+	}
 	if debtShare > 0 {
 		plan += fmt.Sprintf(" · %d%% в долг", debtShare)
 	}
 	cmd.Println(plan)
 
-	if err := evening.RunBatch(cmd.OutOrStderr(), batch, sprint, debtShare); err != nil {
+	if err := evening.RunBatch(cmd.OutOrStderr(), batch, sprint, anchorTime, debtShare); err != nil {
 		return err
 	}
 	if d, err := api.GetDebt(); err == nil {

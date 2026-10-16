@@ -147,7 +147,7 @@ test/
 - `tracker menu [-t min] [-p percent]`: Interactive Bubble Tea task picker table, then starts timer.
 - `tracker dashboard` (aliases: `tui`, `dash`): Live full-screen TUI dashboard.
 - `tracker evening [-c category] [-t sprint-min] [-s skip-task] [-C [-d combo-min]]`: Evening Catch-Up sprint for the task most behind to date (debt, then weekly gap); `-C` chains the top-3 candidates.
-- `tracker evening --batch [-a anchor] [-t 15] [--debt P] [--tasks N]`: Evening batch — anchor + next candidates by debt, one sprint each.
+- `tracker evening --batch [-a anchor] [-T anchor-min] [-t 15] [--debt P] [--tasks N]`: Evening batch — anchor + next candidates by debt, one sprint each.
 - `tracker debt`: This week's debt line, week strip, and items.
 - `tracker session [duration]` (alias: `batch`): Run a schedule-aware percent batch session (default 30m).
 - `tracker plan percent run|schedule`: Start next task from percent plan (`--delay`, `-b batch`); without `-b` one task runs.
