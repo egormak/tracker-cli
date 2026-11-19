@@ -1,49 +1,21 @@
 package statistic
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"strconv"
-	"time"
-	"tracker_cli/config"
 	"tracker_cli/internal/domain/entity"
+	"tracker_cli/internal/repository/api"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 )
 
 func ShowTaskNameList() {
-
-	// Get
-	timeout := time.Duration(15 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s%s", config.TrackerDomain, "/api/v1/tasklist"), nil)
+	taskList, err := api.GetTaskList()
 	if err != nil {
-		slog.Error("error in request", "error", err)
-		os.Exit(1)
-	}
-	resp, err := client.Do(request)
-	if err != nil {
-		slog.Error("error in request", "error", err)
-		os.Exit(1)
-	}
-	if resp.StatusCode != 200 {
-		slog.Error("request error", "status code", resp.StatusCode)
-		os.Exit(1)
-	}
-
-	defer resp.Body.Close()
-
-	var taskList []entity.TaskList
-	err = json.NewDecoder(resp.Body).Decode(&taskList)
-	if err != nil {
-		slog.Error("failed to decode response", "error", err)
+		slog.Error("failed to fetch task list", "error", err)
 		os.Exit(1)
 	}
 

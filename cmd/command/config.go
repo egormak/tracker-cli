@@ -7,13 +7,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"tracker_cli/internal/service/task_params"
-	"tracker_cli/internal/service/timer"
 )
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Configure global timer or per-task parameters",
-	Long:  "Update the global scheduler time or set task-specific timer and priority parameters.",
+	Short: "Configure per-task parameters",
+	Long:  "Set a task's time and priority parameters.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		taskName, err := cmd.Flags().GetString("task")
 		if err != nil {
@@ -26,14 +25,6 @@ var configCmd = &cobra.Command{
 		}
 		if timeMinutes <= 0 {
 			return fmt.Errorf("time must be greater than zero minutes")
-		}
-
-		if taskName == "" {
-			slog.Info("Setting global timer", "minutes", timeMinutes)
-			if err := timer.SetGlobalTime(timeMinutes); err != nil {
-				return fmt.Errorf("failed to set global timer: %w", err)
-			}
-			return nil
 		}
 
 		priority, err := cmd.Flags().GetInt("priority")
@@ -52,7 +43,8 @@ var configCmd = &cobra.Command{
 
 func init() {
 	configCmd.Flags().StringP("task", "n", "", "Task name to configure")
-	configCmd.Flags().IntP("time", "t", 0, "Time duration in minutes")
+	configCmd.Flags().IntP("time", "t", 0, "Task time in minutes")
 	configCmd.Flags().IntP("priority", "p", 0, "Priority value for the task")
+	_ = configCmd.MarkFlagRequired("task")
 	rootCmd.AddCommand(configCmd)
 }

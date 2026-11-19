@@ -60,36 +60,10 @@ func AddTaskRecord(taskName string, timeDone int, sourceDay string) entity.Answe
 
 }
 
-func GetTaskRecords() map[string]map[string]int {
-
-	result := make(map[string]map[string]int)
-	responceBody, err := sendRequest("GET", "/api/v1/records", nil)
-	if err != nil {
-		slog.Error("request error", "error", err)
-		os.Exit(1)
-	}
-	defer responceBody.Close()
-
-	err = json.NewDecoder(responceBody).Decode(&result)
-	if err != nil {
-		slog.Error("failed to decode response: %w", "error", err)
-		os.Exit(1)
-	}
-
-	return result
-
-}
-
 func GetTaskList() ([]entity.TaskList, error) {
-	var taskList []entity.TaskList
-	responseBody, err := sendRequest("GET", "/api/v1/tasklist", nil)
+	state, err := GetDashboardState()
 	if err != nil {
 		return nil, fmt.Errorf("get task list: %w", err)
 	}
-	defer responseBody.Close()
-
-	if err := json.NewDecoder(responseBody).Decode(&taskList); err != nil {
-		return nil, fmt.Errorf("decode task list response: %w", err)
-	}
-	return taskList, nil
+	return state.TodayTasks, nil
 }

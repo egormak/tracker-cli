@@ -17,7 +17,7 @@ import (
 
 var (
 	backlogRolloversGetter = api.GetRolloverTasks
-	backlogDurationGetter  = api.TimeDurationGet
+	backlogDurationGetter  = task.DefaultDuration
 
 	backlogTimerRunner = func(ctx context.Context, delay time.Duration, rollover entity.RolloverTask, duration int) (int, error) {
 		timerObj, err := task.CreateTaskTimerWithSourceDay(rollover.TaskName, duration, rollover.Percent, rollover.SourceDay)
@@ -206,7 +206,7 @@ func runBacklogOnce(ctx context.Context, delay time.Duration, rollover entity.Ro
 		return 0, nil
 	}
 
-	// Fetch next duration from time list
+	// Default session length (ramp fallback, else 15)
 	timeDuration := backlogDurationGetter()
 
 	// Ensure we don't run longer than the deficit

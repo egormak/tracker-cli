@@ -7,8 +7,8 @@ A Go-based command-line interface and Terminal UI (TUI) client for `tracker-serv
 - **Technologies**: Go 1.23.0, Cobra, Bubble Tea, Bubbles, Lipgloss, Gorilla WebSocket, slog with tint.
 - **Architecture**:
   - `cmd/app/main.go`: Application entry point; initializes `slog` with `tint` and invokes Cobra root command.
-  - `cmd/command/`: Individual Cobra CLI command definitions (`task.go`, `menu.go`, `dashboard.go`, `evening.go`, `session.go`, `plan_percent.go`, `plan_backlog.go`, `schedule.go`, `ramp.go`, `debt.go`, `statistic.go`, etc.).
-  - `internal/service/`: Feature-specific business logic and interactive TUI models (`task`, `dashboard`, `debt`, `digest`, `evening`, `menu`, `plan`, `procent`, `role`, `statistic`, `task_params`, `telegram`, `timer`).
+  - `cmd/command/`: Individual Cobra CLI command definitions (`task.go`, `menu.go`, `dashboard.go`, `evening.go`, `session.go`, `plan_percent.go`, `plan_backlog.go`, `schedule.go`, `ramp.go`, `debt.go`, etc.).
+  - `internal/service/`: Feature-specific business logic and interactive TUI models (`task`, `dashboard`, `debt`, `digest`, `evening`, `menu`, `plan`, `procent`, `statistic`, `task_params`, `telegram`).
   - `internal/repository/api/`: REST API client layer (`api.go` with centralized `sendRequest()`, 15-second default timeout, and mockable transport).
   - `internal/repository/ws/`: Reconnecting WebSocket client (`/api/v1/timer/ws`) that receives real-time timer lifecycle events.
   - `internal/domain/entity/`: Shared DTO entities exchanged between API client and service logic.
@@ -59,10 +59,7 @@ go test ./internal/service/plan -run TestRunPercentBatch
 - `tracker ramp [status|reset|set-cap <minutes>]`: Warm-up ramp ladder status, step reset (to 1m), or cap adjustment (min 5m).
 - `tracker taskadd -n "Name" -r "Role" [-t min] [-P priority]`: Register a new task under a role.
 - `tracker tasklist`: Display full task table with priorities, times, and completion.
-- `tracker statistic`: Display today's statistics, completed tasks, and role totals.
-- `tracker config [-n task -t min -p priority]`: Configure task parameters or global scheduler time.
-- `tracker timer-list-set -c [count]`: Seed backend timer slots.
-- `tracker role-recheck`: Recalculate backend role statistics.
+- `tracker config -n task -t min -p priority`: Set a task's time and priority parameters.
 - `tracker clean`: Trigger backend record cleanup.
 
 ## Development Conventions

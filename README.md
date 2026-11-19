@@ -49,12 +49,9 @@ The CLI is stateless and requires an accessible `tracker-server` backend. Config
 ### Tasks
 - `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]` - Add a new task under a role.
 - `tracker tasklist` - Display all tasks in a table.
-- `tracker statistic` - Display today's statistics, completed tasks, and role totals.
-- `tracker config [-n TASK -t MIN -p PRIORITY]` - Configure task parameters or global scheduler time.
+- `tracker config -n TASK -t MIN -p PRIORITY` - Set a task's time and priority parameters.
 
 ### Maintenance
-- `tracker timer-list-set -c COUNT` - Seed backend timer slots.
-- `tracker role-recheck` - Recalculate backend role statistics.
 - `tracker clean` - Trigger backend data cleanup.
 
 Use `tracker --help` or `tracker [command] --help` for detailed flag usage.

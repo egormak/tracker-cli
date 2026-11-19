@@ -17,6 +17,33 @@ var ErrTaskCompleted = fmt.Errorf("no time remaining for this task")
 // ErrTaskAborted indicates the user aborted the task timer early and requested to stop the current plan.
 var ErrTaskAborted = errors.New("task aborted by user")
 
+const defaultSessionMinutes = 15
+
+// DefaultDuration is the default session length when no duration is requested.
+func DefaultDuration() int {
+	status, err := api.GetRampStatus()
+	if err != nil {
+		return defaultSessionMinutes
+	}
+	if status.Config.DefaultFallbackMinutes > 0 {
+		return status.Config.DefaultFallbackMinutes
+	}
+	return defaultSessionMinutes
+}
+
+// todayTask returns the role and the minutes done today of a task from the dashboard state.
+func todayTask(name string) (role string, done int) {
+	state, err := api.GetDashboardState()
+	if err != nil {
+		slog.Warn("failed to read today's tasks", "task", name, "err", err)
+		return "", 0
+	}
+	if t, ok := state.Task(name); ok {
+		return t.Role, t.TimeDone
+	}
+	return "", 0
+}
+
 func TaskRun(cmd *cobra.Command, args []string) error {
 	taskName, err := cmd.Flags().GetString("name")
 	if err != nil {
@@ -93,9 +120,10 @@ func CreateTaskTimer(name string, requestedDuration, percent int) (*TaskTimer, e
 // using the duration already determined by the schedule.
 func CreateTaskTimerWithSourceDay(name string, requestedDuration, percent int, sourceDay string) (*TaskTimer, error) {
 	if sourceDay != "" {
+		role, _ := todayTask(name)
 		return &TaskTimer{
 			Name:         name,
-			Role:         api.TaskRoleGet(name),
+			Role:         role,
 			TimeDuration: requestedDuration,
 			Percent:      percent,
 			SourceDay:    sourceDay,
@@ -109,12 +137,8 @@ func CreateTaskTimerWithSourceDay(name string, requestedDuration, percent int, s
 func GetRampDurationForTask(taskName, role string) (duration int, isRamp bool, rampStep int) {
 	status, err := api.GetRampStatus()
 	if err != nil {
-		slog.Warn("Failed to get ramp status, falling back to legacy timer duration", "err", err)
-		fallback := api.TimeDurationGet()
-		if fallback <= 0 {
-			fallback = 15
-		}
-		return fallback, false, 0
+		slog.Warn("Failed to get ramp status, using the default length", "err", err)
+		return defaultSessionMinutes, false, 0
 	}
 
 	cfg := status.Config
@@ -163,17 +187,16 @@ func GetRampDurationForTask(taskName, role string) (duration int, isRamp bool, r
 // CreateTaskTimerWithPercentFlag initializes a TaskTimer object indicating whether the percent flag was explicitly specified
 func CreateTaskTimerWithPercentFlag(name string, requestedDuration, percent int, percentSpecified bool) (*TaskTimer, error) {
 	taskParams := api.GetTaskParams(name)
-	taskDone := api.StatisticTaskGet(name)
-	role := api.TaskRoleGet(name)
+	role, taskDone := todayTask(name)
 
 	var defaultDuration int
 	var isRamp bool
 	var rampStep int
 
-	if requestedDuration == 0 {
+	if requestedDuration <= 0 {
 		defaultDuration, isRamp, rampStep = GetRampDurationForTask(name, role)
 	} else {
-		defaultDuration = api.TimeDurationGet()
+		defaultDuration = requestedDuration
 	}
 
 	duration, err := calculateDuration(taskParams, requestedDuration, percent, taskDone, defaultDuration, percentSpecified)
@@ -287,7 +310,7 @@ func runTaskWithSchedule(taskName string, requestedTime, requestedPercent int, e
 			duration = requestedTime
 		}
 	} else {
-		role := api.TaskRoleGet(taskName)
+		role, _ := todayTask(taskName)
 		rampDur, isRamp, step := GetRampDurationForTask(taskName, role)
 		if timeLeft > 0 && timeLeft < rampDur {
 			duration = timeLeft

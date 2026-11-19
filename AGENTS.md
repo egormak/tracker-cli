@@ -7,8 +7,8 @@
 
 ## Project Structure & Module Organization
 - `cmd/app/main.go`: Entry point; sets up `slog` default logger with `tint` handler and runs `command.Execute()`.
-- `cmd/command/`: Individual Cobra CLI command files (`task.go`, `menu.go`, `dashboard.go`, `evening.go`, `session.go`, `plan_percent.go`, `plan_backlog.go`, `schedule.go`, `ramp.go`, `debt.go`, `statistic.go`, etc.). Each command registers itself onto `rootCmd` (or parent) via its `init()` function.
-- `internal/service/<feature>/`: Feature-scoped business logic and Bubble Tea models (`task`, `dashboard`, `debt`, `digest`, `evening`, `menu`, `plan`, `procent`, `role`, `statistic`, `task_params`, `telegram`, `timer`).
+- `cmd/command/`: Individual Cobra CLI command files (`task.go`, `menu.go`, `dashboard.go`, `evening.go`, `session.go`, `plan_percent.go`, `plan_backlog.go`, `schedule.go`, `ramp.go`, `debt.go`, etc.). Each command registers itself onto `rootCmd` (or parent) via its `init()` function.
+- `internal/service/<feature>/`: Feature-scoped business logic and Bubble Tea models (`task`, `dashboard`, `debt`, `digest`, `evening`, `menu`, `plan`, `procent`, `statistic`, `task_params`, `telegram`).
 - `internal/repository/api/`: REST API client layer (`sendRequest` with 15s timeout, JSON headers).
 - `internal/repository/ws/`: Reconnecting WebSocket client for `/api/v1/timer/ws`, broadcasting typed timer events (`TASK_STARTED`, `TASK_PAUSED`, `TASK_RESUMED`, `TASK_STOPPED`, `TASK_ADJUSTED`, `HEARTBEAT_ACK`, `STATE_SYNC`).
 - `internal/domain/entity/`: Shared DTOs for requests and responses between API and service layers.
@@ -72,6 +72,5 @@
 - `tracker ramp [status|reset|set-cap <minutes>]`: Warm-up ramp ladder controls.
 - `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`: Add a new task under a role.
 - `tracker tasklist`: List all tasks in table format.
-- `tracker statistic`: Display today's statistics and role totals.
-- `tracker config [-n TASK -t MIN -p PRIORITY]`: Configure task parameters or global scheduler time.
-- `tracker timer-list-set`, `tracker role-recheck`, `tracker clean`: Backend maintenance commands.
+- `tracker config -n TASK -t MIN -p PRIORITY`: Set a task's time and priority parameters.
+- `tracker clean`: Backend maintenance command.

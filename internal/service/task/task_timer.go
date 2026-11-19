@@ -426,6 +426,9 @@ func (t *TaskTimer) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to start task on server: %w", err)
 	}
+	if t.Role == "" {
+		t.Role = runningTask.Role
+	}
 
 	model := newTeaTimerModel(t, runningTask)
 
@@ -545,8 +548,7 @@ func (t *TaskTimer) finalizeSession(elapsed time.Duration, completed bool) {
 	if line := FormatSplit(t.Split); line != "" {
 		fmt.Println(line)
 	}
-	statistic.StatisticTaskShow(t.Name)
-	statistic.StatisticFullShow()
+	statistic.ShowAfterTask(t.Name)
 }
 
 var splitDayShort = map[string]string{

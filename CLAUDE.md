@@ -36,8 +36,7 @@ The backend base URL is a single hardcoded const in `config/config.go` (`Tracker
 ## Architecture
 
 - **`cmd/command/`** — one file per Cobra command. Each file defines a `*cobra.Command` and registers itself onto `rootCmd` (or a parent like `planCmd`) from an `init()` function, so adding a command means creating a new file here rather than editing a central registry.
-- **`internal/service/<feature>/`** — business logic per feature. Bubble Tea models live alongside their feature's service code (`task/task_timer.go`, `dashboard/dashboard.go`, `menu/menu.go`, `evening/evening.go`). There is also a legacy root package `internal/service` (`statistic.go`, `timer.go`) that is still imported by `cmd/command/statistic.go` and `service/plan` — don't confuse it with `service/statistic` / `service/timer`.
-- **`internal/repository/api/`** — the REST client layer, built around a single `sendRequest(method, path, body)` helper in `api.go` (shared 15s-timeout client, JSON headers, non-200 → error).
+- **`internal/service/<feature>/`** — business logic per feature. Bubble Tea models live alongside their feature's service code (`task/task_timer.go`, `dashboard/dashboard.go`, `menu/menu.go`, `evening/evening.go`).- **`internal/repository/api/`** — the REST client layer, built around a single `sendRequest(method, path, body)` helper in `api.go` (shared 15s-timeout client, JSON headers, non-200 → error).
 - **`internal/repository/ws/`** — reconnecting WebSocket client for `/api/v1/timer/ws`, emitting typed events (`TASK_STARTED/PAUSED/RESUMED/STOPPED/ADJUSTED`, `STATE_SYNC`, …).
 - **`internal/domain/entity/`** — DTOs shared between the API layer and services.
 - **`internal/ui/theme/`** — shared Lipgloss palette/styles and role badges; use it for new TUI output rather than defining new colors.
@@ -45,17 +44,17 @@ The backend base URL is a single hardcoded const in `config/config.go` (`Tracker
 
 ### Inconsistent API-call pattern — read before adding backend calls
 
-Not all HTTP calls go through `sendRequest`. These still build their own `http.Client` inline with a duplicated timeout/header block: `internal/service/role/role.go`, `internal/service/telegram/telegram.go`, `internal/service/task_params/task_params.go`, `internal/service/statistic/tasklist.go`, and `GetRolloverTasks` in `internal/repository/api/schedule.go` (the rest of that file uses `sendRequest`). When adding a new backend call, put it in `internal/repository/api/` using `sendRequest` + a typed response struct (see `running_task.go`, `ramp.go`, `timer.go`, `debt.go`), and have the service layer call that.
+Not all HTTP calls go through `sendRequest`. These still build their own `http.Client` inline with a duplicated timeout/header block: `internal/service/telegram/telegram.go`, `internal/service/task_params/task_params.go`, and `GetRolloverTasks` in `internal/repository/api/schedule.go` (the rest of that file uses `sendRequest`). When adding a new backend call, put it in `internal/repository/api/` using `sendRequest` + a typed response struct (see `running_task.go`, `ramp.go`, `dashboard.go`, `debt.go`), and have the service layer call that.
 
 ### Server-synchronized task timer
 
 The backend owns running-task state; the local process only renders it. The flow, spread across `internal/service/task/task.go`, `task_timer.go`, and `internal/repository/api/running_task.go`:
 
-1. `task.CreateTaskTimer` computes the duration to run (from task params, requested time/percent, and time already done) but does not contact the server yet.
+1. `task.CreateTaskTimer` computes the duration to run (from task params, requested time/percent, and time already done) but does not contact the server yet. The task's role and today's done minutes come from `today_tasks` of `GET /api/v1/dashboard/state` (`api.GetDashboardState`); when no duration is requested, the default length is the ramp's `default_fallback_minutes`, else 15 (`task.DefaultDuration`).
 2. `TaskTimer.Run()` calls `POST /api/v1/timer/run/start`, which returns the authoritative `entity.RunningTask`, and opens a `ws.Client`.
 3. The Bubble Tea model (`teaTimerModel`) stays in sync three ways: WebSocket events (another client paused/resumed/stopped/adjusted the task), a `GET /api/v1/timer/run/status` poll every 1.5s as a fallback, and a `POST .../heartbeat` every 20s. A separate 1s local tick only smooths the on-screen display.
 4. Pause/resume (`p`) → `.../pause` / `.../resume`; duration changes → `.../adjust`; stop (`enter`/`q`) or abort (`ctrl+c`) → `.../stop`. `ctrl+c` additionally sets `abortPlan`, which surfaces as `task.ErrTaskAborted` so looping callers (`plan`, `session`, `evening --combo`) stop chaining tasks. Bubble Tea's own signal handling is disabled; a custom `SIGINT` forwarder sends `interruptMsg` into the program.
-5. On a completed run, the timer sends a percent-plan-change Telegram message (`procent.ChangeGroupPlanPercent`, `telegram`) and fires a desktop notification. After any stop it prints where the session's minutes went when the server split them (`task.FormatSplit` over the stop response's `split[]`, e.g. `Записано: сегодня 15 · Ср +5`), then stats.
+5. On a completed run, the timer sends a percent-plan-change Telegram message (`procent.ChangeGroupPlanPercent`, `telegram`) and fires a desktop notification. After any stop it prints where the session's minutes went when the server split them (`task.FormatSplit` over the stop response's `split[]`, e.g. `Записано: сегодня 15 · Ср +5`), then the task's and the day's totals from `/dashboard/state` (`statistic.ShowAfterTask`).
 
 `tracker dashboard` (`internal/service/dashboard`) is a separate full-screen TUI that polls the running task, task list, rollover, debt (`GET /api/v1/debt`; line + week strip in the progress card, line in the footer), schedule, evening focus, and ramp status, and can pause/resume/adjust(±5)/stop the running task and reset the ramp.
 
@@ -87,10 +86,10 @@ Both loop only with `--batch` (a wall-clock budget: each task's duration is clam
 - `tracker plan percent set --role R --values v1,v2,...` — update a role's percent distribution
 - `tracker schedule adjust <task> <delta-min> [-d day]` / `schedule set <task> <target-min> [-d day]` / `schedule rollover` — edit this week's schedule targets or view rollover
 - `tracker ramp [status|reset|set-cap <minutes>]` — warm-up ramp ladder
-- `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`, `tracker tasklist`, `tracker statistic`
+- `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`, `tracker tasklist`
 - `tracker summary week [--previous] [--md]` — weekly digest from `GET /api/v1/stats/weekly/digest` (`internal/service/digest`); `tracker clean` prints it for the week it is about to wipe (`previous` on Monday) and cleans even if the digest fails
-- `tracker config [-n TASK -t MIN -p PRIORITY]` — with `-n`, sets that task's params; without it, `-t` sets the global scheduler time
-- `tracker timer-list-set -c COUNT`, `tracker role-recheck`, `tracker clean` — backend maintenance endpoints
+- `tracker config -n TASK -t MIN -p PRIORITY` — sets that task's time and priority (`-n` is required)
+- `tracker clean` — backend maintenance endpoint
 
 ## Other agent instruction files
 

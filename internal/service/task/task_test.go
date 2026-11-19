@@ -3,6 +3,7 @@ package task
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -131,6 +132,100 @@ func TestCalculateTimeLeft(t *testing.T) {
 			t.Errorf("calculateTimeLeft(%d, %d, %d) = %d, want %d", tt.planDuration, tt.percent, tt.done, got, tt.want)
 		}
 	}
+}
+
+const testDashboardBody = `{"running_task": null, "today_tasks": [{"name": "work", "role": "work", "time_duration": 270, "time_done": 90, "priority": 1}, {"name": "english", "role": "learn", "time_duration": 30, "time_done": 0, "priority": 2}], "evening_focus": null, "total_planned": 300, "total_done": 90, "completion_pct": 30}`
+
+func rampStatusBody(fallback int) string {
+	return fmt.Sprintf(`{"current_step": 4, "cap_minutes": 25, "is_capped": false, "today_focus_minutes": 8, "date": "23 September 2026", "config": {"cap_minutes": 25, "enabled_roles": ["work"], "enabled_tasks": [], "excluded_tasks": [], "default_fallback_minutes": %d}}`, fallback)
+}
+
+func fakeServer(status int, body string, paths *[]string) roundTripFunc {
+	return func(req *http.Request) (*http.Response, error) {
+		if paths != nil {
+			*paths = append(*paths, req.URL.Path)
+		}
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Header:     make(http.Header),
+		}, nil
+	}
+}
+
+func TestDefaultDuration(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   string
+		want   int
+	}{
+		{"fallback from ramp", http.StatusOK, rampStatusBody(12), 12},
+		{"fallback zero", http.StatusOK, rampStatusBody(0), 15},
+		{"server error", http.StatusInternalServerError, `{"error":"fail"}`, 15},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanup := api.SetClientTransport(fakeServer(tt.status, tt.body, nil))
+			defer cleanup()
+
+			if got := DefaultDuration(); got != tt.want {
+				t.Errorf("DefaultDuration() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRampDurationForTask_RampError(t *testing.T) {
+	var paths []string
+	cleanup := api.SetClientTransport(fakeServer(http.StatusInternalServerError, `{"error":"fail"}`, &paths))
+	defer cleanup()
+
+	dur, isRamp, step := GetRampDurationForTask("work", "work")
+	if dur != 15 || isRamp || step != 0 {
+		t.Errorf("got (%d, %v, %d), want (15, false, 0)", dur, isRamp, step)
+	}
+	if len(paths) == 0 {
+		t.Fatal("expected a request to the ramp status")
+	}
+	for _, p := range paths {
+		if p != "/api/v1/ramp/status" {
+			t.Errorf("unexpected request to %s", p)
+		}
+	}
+}
+
+func TestTodayTask(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
+		cleanup := api.SetClientTransport(fakeServer(http.StatusOK, testDashboardBody, nil))
+		defer cleanup()
+
+		role, done := todayTask("work")
+		if role != "work" || done != 90 {
+			t.Errorf("todayTask(work) = (%q, %d), want (work, 90)", role, done)
+		}
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		cleanup := api.SetClientTransport(fakeServer(http.StatusOK, testDashboardBody, nil))
+		defer cleanup()
+
+		role, done := todayTask("missing")
+		if role != "" || done != 0 {
+			t.Errorf("todayTask(missing) = (%q, %d), want (\"\", 0)", role, done)
+		}
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		cleanup := api.SetClientTransport(fakeServer(http.StatusInternalServerError, `{"error":"fail"}`, nil))
+		defer cleanup()
+
+		role, done := todayTask("work")
+		if role != "" || done != 0 {
+			t.Errorf("todayTask(work) = (%q, %d), want (\"\", 0)", role, done)
+		}
+	})
 }
 
 func TestGetRampDurationForTask(t *testing.T) {

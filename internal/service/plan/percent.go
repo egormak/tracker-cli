@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"tracker_cli/internal/repository/api"
-	"tracker_cli/internal/service"
 	"tracker_cli/internal/service/task"
 	"tracker_cli/internal/service/telegram"
 )
@@ -27,7 +26,7 @@ var (
 			if err != nil {
 				return "", 0, 0, "", err
 			}
-			defaultDuration := service.TimeDurationGet(name)
+			defaultDuration := task.DefaultDuration()
 			if timeLeft > 0 && timeLeft < defaultDuration {
 				duration = timeLeft
 			} else {
@@ -40,7 +39,7 @@ var (
 		if err != nil {
 			return "", 0, 0, "", err
 		}
-		duration = service.TimeDurationGet(name)
+		duration = task.DefaultDuration()
 		return name, percent, duration, "", nil
 	}
 

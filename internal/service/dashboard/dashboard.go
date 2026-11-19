@@ -72,10 +72,12 @@ func fetchDashboardDataCmd() tea.Cmd {
 			msg.runningTask = rt
 		}
 
-		// 2. Task List
-		tl, err := api.GetTaskList()
+		// 2. Task list and day totals
+		state, err := api.GetDashboardState()
 		if err == nil {
-			msg.taskList = tl
+			msg.taskList = state.TodayTasks
+			msg.scheduledTime = state.TotalPlanned
+			msg.completedTime = state.TotalDone
 		}
 
 		// 3. Rollover Tasks
@@ -89,11 +91,7 @@ func fetchDashboardDataCmd() tea.Cmd {
 			msg.debt = d
 		}
 
-		// 5. Scheduled & Completed Time
-		st, _ := api.GetScheduledTimeToday()
-		msg.scheduledTime = st
-		ct, _ := api.GetCompletionTimeDoneToday()
-		msg.completedTime = ct
+		// 5. Scheduled & completed time come with the dashboard state (2)
 
 		// 6. Evening Focus
 		ef, _ := api.GetEveningFocus("", 20)

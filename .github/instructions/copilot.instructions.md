@@ -29,19 +29,14 @@ cmd/
     ├── plan_backlog.go     # Backlog/rollover planning commands
     ├── schedule.go         # Weekly schedule adjustment & rollover commands
     ├── ramp.go             # Linear warm-up ramp ladder commands
-    ├── statistic.go        # Statistics display command
-    ├── config.go           # Global timer and task parameter configuration
-    ├── role_recheck.go     # Recalculate role statistics
-    ├── timer_list_set.go   # Seed backend timer slots
+    ├── config.go           # Task parameter configuration
     └── manager.go          # Backend data cleanup
 
 internal/
 ├── domain/
 │   └── entity/             # Shared DTOs for API requests/responses
-│       ├── task.go         # Task*, TaskList, TaskParams, TaskRecord
-│       ├── role.go         # RoleAnswer struct
-│       ├── statistic.go    # TaskTimeDurationResponse
-│       ├── timers.go       # RunningTask and timer entities
+│       ├── task.go         # Task*, TaskList, TaskParams, TaskRecord, RunningTask
+│       ├── dashboard.go    # DashboardState (today_tasks, day totals)
 │       ├── evening.go      # EveningFocusCandidate entities
 │       ├── debt.go         # DebtSummary, DebtItem, DebtDay, SplitPart
 │       ├── ramp.go         # RampStatus and ramp requests
@@ -51,16 +46,14 @@ internal/
 │   ├── api/                # External REST API client implementations
 │   │   ├── api.go          # Centralized sendRequest() & SetClientTransport()
 │   │   ├── running_task.go # Start, status, pause, resume, stop, adjust, heartbeat
-│   │   ├── task.go         # GetTaskParams, AddTaskRecord, GetTaskRecords
+│   │   ├── task.go         # GetTaskParams, AddTaskRecord, GetTaskList
 │   │   ├── plan_percent.go # Percentage planning endpoints
 │   │   ├── procents.go     # Role percentage distributions
 │   │   ├── schedule.go     # Schedule adjust, set, rollover
 │   │   ├── evening.go      # Evening focus and skip endpoints
 │   │   ├── ramp.go         # Warm-up ramp API
 │   │   ├── debt.go         # GetDebt (GET /api/v1/debt)
-│   │   ├── statistic.go    # Completion stats
-│   │   ├── role.go         # Task role endpoints
-│   │   ├── timer.go        # Timer count endpoints
+│   │   ├── dashboard.go    # GetDashboardState (GET /api/v1/dashboard/state)
 │   │   └── clean_data.go   # Data cleanup operations
 │   └── ws/                 # WebSocket client
 │       └── client.go       # Reconnecting client for /api/v1/timer/ws
@@ -74,8 +67,6 @@ internal/
 │   ├── procent/            # Percentage management and distribution
 │   ├── task_params/        # Task parameter configuration
 │   ├── statistic/          # Statistics formatting and display
-│   ├── role/               # Role management
-│   ├── timer/              # Timer management
 │   ├── telegram/           # Telegram notifications
 │   └── manager/            # Backend cleanup service
 ├── ui/
@@ -159,8 +150,5 @@ test/
 - `tracker ramp [status|reset|set-cap <minutes>]`: Warm-up ramp ladder management.
 - `tracker taskadd -n NAME -r ROLE [-t min] [-P priority]`: Add a new task under a role.
 - `tracker tasklist`: Display full task table.
-- `tracker statistic`: Display today's statistics, completed tasks, and role totals.
-- `tracker config [-n TASK -t MIN -p PRIORITY]`: Configure task parameters or global scheduler time.
-- `tracker timer-list-set -c COUNT`: Seed backend timer slots.
-- `tracker role-recheck`: Recalculate backend role statistics.
+- `tracker config -n TASK -t MIN -p PRIORITY`: Set a task's time and priority parameters.
 - `tracker clean`: Trigger backend record cleanup.
