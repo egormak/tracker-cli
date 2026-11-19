@@ -36,7 +36,8 @@ The backend base URL is a single hardcoded const in `config/config.go` (`Tracker
 ## Architecture
 
 - **`cmd/command/`** — one file per Cobra command. Each file defines a `*cobra.Command` and registers itself onto `rootCmd` (or a parent like `planCmd`) from an `init()` function, so adding a command means creating a new file here rather than editing a central registry.
-- **`internal/service/<feature>/`** — business logic per feature. Bubble Tea models live alongside their feature's service code (`task/task_timer.go`, `dashboard/dashboard.go`, `menu/menu.go`, `evening/evening.go`).- **`internal/repository/api/`** — the REST client layer, built around a single `sendRequest(method, path, body)` helper in `api.go` (shared 15s-timeout client, JSON headers, non-200 → error).
+- **`internal/service/<feature>/`** — business logic per feature. Bubble Tea models live alongside their feature's service code (`task/task_timer.go`, `dashboard/dashboard.go`, `menu/menu.go`, `evening/evening.go`).
+- **`internal/repository/api/`** — the REST client layer, built around a single `sendRequest(method, path, body)` helper in `api.go` (shared 15s-timeout client, JSON headers, non-200 → error).
 - **`internal/repository/ws/`** — reconnecting WebSocket client for `/api/v1/timer/ws`, emitting typed events (`TASK_STARTED/PAUSED/RESUMED/STOPPED/ADJUSTED`, `STATE_SYNC`, …).
 - **`internal/domain/entity/`** — DTOs shared between the API layer and services.
 - **`internal/ui/theme/`** — shared Lipgloss palette/styles and role badges; use it for new TUI output rather than defining new colors.
