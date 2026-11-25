@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Tracker CLI is a Go command-line client for a separate Tracker backend service (time/task tracking with three roles: Work, Learn, Rest). It has no local persistence or database of its own — every command reads or writes state by calling the backend's REST API (plus a WebSocket for live timer events). Cobra provides the command tree; Bubble Tea (+ Lipgloss) provides the interactive TUI parts (task timer, dashboard, task-selection menu, evening picker).
 
-The backend's HTTP contract is documented in `openapi.yml` at the repo root — check it when a command's request/response shape is unclear.
+The backend's HTTP contract is `tracker-server/openapi.yml` in the sibling `tracker-server` repo — check it when a command's request/response shape is unclear.
 
 ## Build, Test, Run
 
