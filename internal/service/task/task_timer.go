@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -26,6 +27,29 @@ const (
 	// timeFormat is the display format for task completion time in Telegram
 	timeFormat = "2 January 2006 15:04"
 )
+
+// serverRetryWindow is how long a failing status poll or stop call is retried before the
+// timer closes and leaves the task on the server. Swapped by tests.
+var serverRetryWindow = 30 * time.Second
+
+// pollInterval is the status poll period. Swapped by tests.
+var pollInterval = 1500 * time.Millisecond
+
+// stopRetryInterval is the pause between stop attempts. Swapped by tests.
+var stopRetryInterval = 2 * time.Second
+
+// timerNow is the clock of the retry windows. Swapped by tests.
+var timerNow = time.Now
+
+// statusFetcher is swapped by tests.
+var statusFetcher = api.GetRunningTaskStatus
+
+// stopRunningTask is swapped by tests.
+var stopRunningTask = api.StopRunningTask
+
+// ErrServerUnreachable is returned when the timer closed because the server stayed
+// unreachable for serverRetryWindow; the task is left running on the server.
+var ErrServerUnreachable = fmt.Errorf("server unreachable: %w", ErrTaskAborted)
 
 type timerKeymap struct {
 	pause key.Binding
@@ -81,6 +105,11 @@ type teaTimerModel struct {
 	exitState   exitState
 	showHelp    bool
 	stopping    bool
+
+	// pollFailingSince and stopFailingSince mark the first failure of the current run of
+	// failed status polls and stop calls; zero while the server answers.
+	pollFailingSince time.Time
+	stopFailingSince time.Time
 }
 
 type statusPollMsg struct {
@@ -121,13 +150,14 @@ type exitState struct {
 	shouldSave bool
 	abortPlan  bool
 	completed  bool
+	serverLost bool // the server stayed unreachable past serverRetryWindow
 }
 
 type interruptMsg struct{}
 
 func pollStatusCmd(taskName string) tea.Cmd {
-	return tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg {
-		status, err := api.GetRunningTaskStatus(taskName)
+	return tea.Tick(pollInterval, func(t time.Time) tea.Msg {
+		status, err := statusFetcher(taskName)
 		return statusPollMsg{task: status, err: err}
 	})
 }
@@ -153,9 +183,17 @@ func togglePauseCmd(taskName string, currentlyRunning bool) tea.Cmd {
 
 func stopTaskCmd(taskName string, abortPlan bool) tea.Cmd {
 	return func() tea.Msg {
-		record, err := api.StopRunningTask(taskName)
+		record, err := stopRunningTask(taskName)
 		return stopTaskResultMsg{record: record, abortPlan: abortPlan, err: err}
 	}
+}
+
+// stopRetryCmd calls the stop again after stopRetryInterval.
+func stopRetryCmd(taskName string, abortPlan bool) tea.Cmd {
+	return tea.Tick(stopRetryInterval, func(time.Time) tea.Msg {
+		record, err := stopRunningTask(taskName)
+		return stopTaskResultMsg{record: record, abortPlan: abortPlan, err: err}
+	})
 }
 
 func newTeaTimerModel(task *TaskTimer, runningTask entity.RunningTask) teaTimerModel {
@@ -219,13 +257,22 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, smoothTickCmd()
 
 	case statusPollMsg:
-		if msg.err != nil {
-			slog.Error("Failed to fetch running task status from server", "error", msg.err)
-			return m, tea.Quit
-		}
 		if m.stopping {
 			return m, nil
 		}
+		if msg.err != nil {
+			if m.pollFailingSince.IsZero() {
+				m.pollFailingSince = timerNow()
+			}
+			if timerNow().Sub(m.pollFailingSince) < serverRetryWindow {
+				slog.Warn("Failed to fetch running task status from server, retrying", "error", msg.err)
+				return m, pollStatusCmd(m.task.Name)
+			}
+			slog.Error("Failed to fetch running task status from server", "error", msg.err)
+			m.exitState = exitState{serverLost: true}
+			return m, tea.Quit
+		}
+		m.pollFailingSince = time.Time{}
 		if msg.task.TaskName == "" || msg.task.TaskName != m.task.Name {
 			// Task was stopped or completed from another service!
 			m.exitState = exitState{shouldSave: false, completed: true, abortPlan: false}
@@ -258,9 +305,18 @@ func (m teaTimerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case stopTaskResultMsg:
 		if msg.err != nil {
+			if m.stopFailingSince.IsZero() {
+				m.stopFailingSince = timerNow()
+			}
+			if timerNow().Sub(m.stopFailingSince) < serverRetryWindow {
+				slog.Warn("Failed to stop running task on server, retrying", "error", msg.err)
+				return m, stopRetryCmd(m.task.Name, msg.abortPlan)
+			}
 			slog.Error("Failed to stop running task on server", "error", msg.err)
+			m.exitState = exitState{serverLost: true}
 			return m, tea.Quit
 		}
+		m.stopFailingSince = time.Time{}
 		m.task.TimeEnd = time.Now()
 		m.task.TimeDone = float64(msg.record.TimeDuration)
 		m.task.Split = msg.record.Split
@@ -391,6 +447,9 @@ func (m teaTimerModel) getStatus() string {
 	if m.exitState.shouldSave {
 		return "quitting"
 	}
+	if !m.pollFailingSince.IsZero() || !m.stopFailingSince.IsZero() {
+		return "server unreachable, retrying"
+	}
 	if m.isRunning {
 		return "running"
 	}
@@ -475,15 +534,26 @@ func (t *TaskTimer) Run() error {
 		return fmt.Errorf("invalid timer result: expected teaTimerModel, got %T", result)
 	}
 
-	// Handle exit state
-	if !timerResult.exitState.shouldSave {
+	return t.handleExit(os.Stderr, timerResult)
+}
+
+// handleExit acts on the timer's exit state; w gets the message shown when the server
+// was lost.
+func (t *TaskTimer) handleExit(w io.Writer, m teaTimerModel) error {
+	if m.exitState.serverLost {
+		fmt.Fprintf(w, "Server unreachable for %s: timer closed. Task %q stays on the server; it pauses after 3 minutes without a heartbeat and keeps its time. Start it again to resume.\n", serverRetryWindow, t.Name)
+		slog.Warn("timer closed, task left on the server", "task", t.Name)
+		return ErrServerUnreachable
+	}
+
+	if !m.exitState.shouldSave {
 		slog.Info("timer cancelled without saving", "task", t.Name)
 		return nil
 	}
 
-	t.finalizeSession(timerResult.elapsed, timerResult.exitState.completed)
+	t.finalizeSession(m.elapsed, m.exitState.completed)
 
-	if timerResult.exitState.abortPlan {
+	if m.exitState.abortPlan {
 		return ErrTaskAborted
 	}
 	return nil
